@@ -1,6 +1,6 @@
 {
   "name": "codeagent-wrapper",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Unified wrapper for AI CLI backends (Codex, Claude, Gemini, Opencode)",
   "main": "./src/main.mjs",
   "bin": {
