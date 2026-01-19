@@ -2,6 +2,58 @@
  * Utility functions for codeagent-wrapper
  */
 
+// =============================================================================
+// Pre-compiled Regular Expressions (Module-level constants for performance)
+// =============================================================================
+
+// T3.1: Combined sanitization pattern (ANSI escape + OSC sequences + control chars)
+// eslint-disable-next-line no-control-regex
+const SANITIZE_PATTERN = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|[\x00-\x08\x0b\x0c\x0e-\x1f]/g;
+
+// Coverage extraction pattern
+const COVERAGE_PATTERN = /(?:coverage[:\s]*)?(\d+(?:\.\d+)?)\s*%/i;
+
+// File change patterns
+const FILE_CHANGE_PATTERNS = [
+  /(?:Modified|Created|Updated|Changed|Edited|Deleted):\s*(.+)/i,
+  /(?:^|\s)([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)(?:\s|$)/
+];
+
+// Test result patterns
+const TEST_PASSED_PATTERN = /(\d+)\s*(?:tests?\s+)?passed/i;
+const TEST_FAILED_PATTERN = /(\d+)\s*(?:tests?\s+)?failed/i;
+const TEST_COUNT_PATTERN = /tests?:\s*(\d+)/i;
+
+// Key output summary patterns
+const SUMMARY_PATTERNS = [
+  /^Summary:\s*(.+)/i,
+  /^Completed:\s*(.+)/i,
+  /^Result:\s*(.+)/i,
+  /^Output:\s*(.+)/i
+];
+
+// Coverage gap patterns
+const COVERAGE_GAP_PATTERNS = [
+  /(?:uncovered|not covered|missing coverage)[:\s]*(.+)/i,
+  /(?:coverage gap)[:\s]*(.+)/i
+];
+
+// Error patterns
+const ERROR_PATTERNS = [
+  /(?:error|fail|exception)[:\s]*(.+)/i,
+  /(?:stack trace|traceback)[:\s]*/i
+];
+
+// Stdin detection pattern
+const STDIN_SPECIAL_CHARS_PATTERN = /[\n\\"`'$]/;
+
+// Session ID validation pattern
+const SESSION_ID_PATTERN = /^[a-zA-Z0-9_\-]+$/;
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
+
 /**
  * Remove ANSI escape sequences from text
  * @param {string} text - Text to sanitize
@@ -9,11 +61,8 @@
  */
 export function sanitizeOutput(text) {
   if (!text) return '';
-  // Remove ANSI escape sequences
-  // eslint-disable-next-line no-control-regex
-  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
-             .replace(/\x1b\][^\x07]*\x07/g, '')  // OSC sequences
-             .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');  // Control chars except \t\n\r
+  // T3.1: Single combined pattern for better performance
+  return text.replace(SANITIZE_PATTERN, '');
 }
 
 /**
@@ -24,7 +73,7 @@ export function sanitizeOutput(text) {
 export function extractCoverageFromLines(lines) {
   for (const line of lines) {
     // Match patterns like "Coverage: 92%", "92% coverage", "coverage: 92.5%"
-    const match = line.match(/(?:coverage[:\s]*)?(\d+(?:\.\d+)?)\s*%/i);
+    const match = line.match(COVERAGE_PATTERN);
     if (match) {
       const num = parseFloat(match[1]);
       return { coverage: `${num}%`, coverageNum: num };
@@ -40,13 +89,9 @@ export function extractCoverageFromLines(lines) {
  */
 export function extractFilesChangedFromLines(lines) {
   const files = new Set();
-  const filePatterns = [
-    /(?:Modified|Created|Updated|Changed|Edited|Deleted):\s*(.+)/i,
-    /(?:^|\s)([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)(?:\s|$)/
-  ];
 
   for (const line of lines) {
-    for (const pattern of filePatterns) {
+    for (const pattern of FILE_CHANGE_PATTERNS) {
       const match = line.match(pattern);
       if (match && match[1]) {
         const file = match[1].trim();
@@ -73,14 +118,14 @@ export function extractTestResultsFromLines(lines) {
 
   for (const line of lines) {
     // Match patterns like "12 passed, 2 failed", "Tests: 10 passed"
-    const passMatch = line.match(/(\d+)\s*(?:tests?\s+)?passed/i);
-    const failMatch = line.match(/(\d+)\s*(?:tests?\s+)?failed/i);
+    const passMatch = line.match(TEST_PASSED_PATTERN);
+    const failMatch = line.match(TEST_FAILED_PATTERN);
     
     if (passMatch) passed = parseInt(passMatch[1], 10);
     if (failMatch) failed = parseInt(failMatch[1], 10);
     
     // Also match "Tests: X" pattern
-    const testsMatch = line.match(/tests?:\s*(\d+)/i);
+    const testsMatch = line.match(TEST_COUNT_PATTERN);
     if (testsMatch && passed === 0) {
       passed = parseInt(testsMatch[1], 10);
     }
@@ -95,15 +140,8 @@ export function extractTestResultsFromLines(lines) {
  * @returns {string} Key output summary
  */
 export function extractKeyOutputFromLines(lines) {
-  const summaryPatterns = [
-    /^Summary:\s*(.+)/i,
-    /^Completed:\s*(.+)/i,
-    /^Result:\s*(.+)/i,
-    /^Output:\s*(.+)/i
-  ];
-
   for (const line of lines) {
-    for (const pattern of summaryPatterns) {
+    for (const pattern of SUMMARY_PATTERNS) {
       const match = line.match(pattern);
       if (match && match[1]) {
         return match[1].trim();
@@ -128,13 +166,8 @@ export function extractKeyOutputFromLines(lines) {
  * @returns {string} Coverage gap info
  */
 export function extractCoverageGap(lines) {
-  const gapPatterns = [
-    /(?:uncovered|not covered|missing coverage)[:\s]*(.+)/i,
-    /(?:coverage gap)[:\s]*(.+)/i
-  ];
-
   for (const line of lines) {
-    for (const pattern of gapPatterns) {
+    for (const pattern of COVERAGE_GAP_PATTERNS) {
       const match = line.match(pattern);
       if (match && match[1]) {
         return match[1].trim();
@@ -151,11 +184,6 @@ export function extractCoverageGap(lines) {
  * @returns {string} Error detail
  */
 export function extractErrorDetail(lines) {
-  const errorPatterns = [
-    /(?:error|fail|exception)[:\s]*(.+)/i,
-    /(?:stack trace|traceback)[:\s]*/i
-  ];
-
   const errorLines = [];
   let capturing = false;
 
@@ -166,7 +194,7 @@ export function extractErrorDetail(lines) {
       continue;
     }
 
-    for (const pattern of errorPatterns) {
+    for (const pattern of ERROR_PATTERNS) {
       if (pattern.test(line)) {
         errorLines.push(line);
         capturing = true;
@@ -192,7 +220,7 @@ export function shouldUseStdin(task, piped = false, explicit = false) {
   
   // Use stdin for long tasks or tasks with special characters
   if (task.length > 800) return true;
-  if (/[\n\\"`'$]/.test(task)) return true;
+  if (STDIN_SPECIAL_CHARS_PATTERN.test(task)) return true;
   
   return false;
 }
@@ -253,5 +281,88 @@ export function expandHome(filepath) {
 export function isValidSessionId(sessionId) {
   if (!sessionId || typeof sessionId !== 'string') return false;
   // Session IDs are typically alphanumeric with some special chars
-  return /^[a-zA-Z0-9_\-]+$/.test(sessionId) && sessionId.length > 0;
+  return SESSION_ID_PATTERN.test(sessionId) && sessionId.length > 0;
+}
+
+/**
+ * T1.3: Extract all metrics from output lines in a single pass
+ * This is more efficient than calling individual extraction functions
+ * @param {string[]} lines - Output lines
+ * @returns {{coverage: string, coverageNum: number, filesChanged: string[], testsPassed: number, testsFailed: number, keyOutput: string}}
+ */
+export function extractAllMetrics(lines) {
+  let coverage = '';
+  let coverageNum = 0;
+  const files = new Set();
+  let testsPassed = 0;
+  let testsFailed = 0;
+  let keyOutput = '';
+  let firstMeaningfulLine = '';
+
+  for (const line of lines) {
+    // Extract coverage (only first match)
+    if (!coverage) {
+      const coverageMatch = line.match(COVERAGE_PATTERN);
+      if (coverageMatch) {
+        coverageNum = parseFloat(coverageMatch[1]);
+        coverage = `${coverageNum}%`;
+      }
+    }
+
+    // Extract files changed (up to 10)
+    if (files.size < 10) {
+      for (const pattern of FILE_CHANGE_PATTERNS) {
+        const fileMatch = line.match(pattern);
+        if (fileMatch && fileMatch[1]) {
+          const file = fileMatch[1].trim();
+          if (file.includes('.') && !file.includes(' ') && file.length < 200) {
+            files.add(file);
+          }
+        }
+      }
+    }
+
+    // Extract test results
+    const passMatch = line.match(TEST_PASSED_PATTERN);
+    const failMatch = line.match(TEST_FAILED_PATTERN);
+    if (passMatch) testsPassed = parseInt(passMatch[1], 10);
+    if (failMatch) testsFailed = parseInt(failMatch[1], 10);
+    if (testsPassed === 0) {
+      const testsMatch = line.match(TEST_COUNT_PATTERN);
+      if (testsMatch) testsPassed = parseInt(testsMatch[1], 10);
+    }
+
+    // Extract key output (only first match)
+    if (!keyOutput) {
+      for (const pattern of SUMMARY_PATTERNS) {
+        const summaryMatch = line.match(pattern);
+        if (summaryMatch && summaryMatch[1]) {
+          keyOutput = summaryMatch[1].trim();
+          break;
+        }
+      }
+    }
+
+    // Track first meaningful line for fallback
+    if (!firstMeaningfulLine) {
+      const trimmed = line.trim();
+      if (trimmed && trimmed.length > 10 && !trimmed.startsWith('#')) {
+        firstMeaningfulLine = trimmed.slice(0, 200);
+      }
+    }
+  }
+
+  // Fallback for keyOutput
+  if (!keyOutput && firstMeaningfulLine) {
+    keyOutput = firstMeaningfulLine;
+  }
+
+  return {
+    coverage,
+    coverageNum,
+    filesChanged: Array.from(files).slice(0, 10),
+    testsPassed,
+    testsFailed,
+    keyOutput
+  };
 }

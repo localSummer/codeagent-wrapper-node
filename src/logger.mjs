@@ -12,22 +12,64 @@ const FLUSH_INTERVAL_MS = 500;
 const QUEUE_SIZE = 1000;
 const CLOSE_TIMEOUT_MS = parseInt(process.env.CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS || '5000', 10);
 
+// T4.1: Lazy initialization - cache log directory path and initialization promise
+let cachedLogDir = null;
+let logDirInitPromise = null;
+
 /**
- * Get the log directory path
- * Creates ~/.codeagent/logs if it doesn't exist
+ * Get the log directory path (synchronous, for compatibility)
+ * @returns {string}
+ */
+function getLogDirPath() {
+  if (cachedLogDir) return cachedLogDir;
+  
+  const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
+  cachedLogDir = path.join(homeDir, '.codeagent', 'logs');
+  return cachedLogDir;
+}
+
+/**
+ * Ensure log directory exists (async version)
+ * T4.1: Uses async fs operations instead of sync
+ * @returns {Promise<string>}
+ */
+async function ensureLogDir() {
+  const logDir = getLogDirPath();
+  
+  if (!logDirInitPromise) {
+    logDirInitPromise = fs.promises.mkdir(logDir, { recursive: true })
+      .then(() => logDir)
+      .catch(() => logDir); // Directory may already exist
+  }
+  
+  return logDirInitPromise;
+}
+
+/**
+ * Get the log directory path (sync fallback for createLogger compatibility)
+ * T4.1: Only creates directory synchronously if async init hasn't completed
  * @returns {string}
  */
 function getLogDir() {
-  const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
-  const logDir = path.join(homeDir, '.codeagent', 'logs');
+  const logDir = getLogDirPath();
   
-  // Ensure directory exists (sync for simplicity at startup)
+  // If async init is in progress or completed, just return the path
+  // The directory will be created before first write completes
+  if (logDirInitPromise) {
+    return logDir;
+  }
+  
+  // Fallback: synchronous creation only if async init hasn't started
+  // This maintains backward compatibility
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
   
   return logDir;
 }
+
+// T4.1: Start async directory initialization at module load
+ensureLogDir();
 
 /**
  * Async Logger class
@@ -95,8 +137,9 @@ export class Logger {
     // Store errors and warnings
     if (level === 'error' || level === 'warn') {
       this.#errorEntries.push(entry);
-      if (this.#errorEntries.length > MAX_ERROR_ENTRIES) {
-        this.#errorEntries.shift();
+      // T3.3: Batch cleanup when exceeding 2x limit to reduce array operations
+      if (this.#errorEntries.length > MAX_ERROR_ENTRIES * 2) {
+        this.#errorEntries = this.#errorEntries.slice(-MAX_ERROR_ENTRIES);
       }
     }
 

@@ -1,8 +1,10 @@
 /**
  * Init module - Initialize codeagent skill in ~/.claude/skills/
+ * T4.2: All file operations converted to async
  */
 
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
+import { existsSync } from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { fileURLToPath } from 'url';
@@ -47,43 +49,47 @@ async function confirm(question) {
 }
 
 /**
- * Copy directory recursively
+ * Copy directory recursively (async version)
+ * T4.2: Converted from sync to async
  * @param {string} src - Source directory
  * @param {string} dest - Destination directory
  */
-function copyDirSync(src, dest) {
-  fs.mkdirSync(dest, { recursive: true });
+async function copyDir(src, dest) {
+  await fs.mkdir(dest, { recursive: true });
   
-  const entries = fs.readdirSync(src, { withFileTypes: true });
+  const entries = await fs.readdir(src, { withFileTypes: true });
   
-  for (const entry of entries) {
+  // Process entries concurrently for better performance
+  await Promise.all(entries.map(async (entry) => {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
     
     if (entry.isDirectory()) {
-      copyDirSync(srcPath, destPath);
+      await copyDir(srcPath, destPath);
     } else {
-      fs.copyFileSync(srcPath, destPath);
+      await fs.copyFile(srcPath, destPath);
     }
-  }
+  }));
 }
 
 /**
- * List files in directory recursively
+ * List files in directory recursively (async version)
+ * T4.2: Converted from sync to async
  * @param {string} dir - Directory path
  * @param {string} [prefix=''] - Path prefix for display
- * @returns {string[]}
+ * @returns {Promise<string[]>}
  */
-function listFiles(dir, prefix = '') {
+async function listFiles(dir, prefix = '') {
   const files = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const entries = await fs.readdir(dir, { withFileTypes: true });
   
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     const displayPath = prefix ? `${prefix}/${entry.name}` : entry.name;
     
     if (entry.isDirectory()) {
-      files.push(...listFiles(fullPath, displayPath));
+      const subFiles = await listFiles(fullPath, displayPath);
+      files.push(...subFiles);
     } else {
       files.push(displayPath);
     }
@@ -93,7 +99,23 @@ function listFiles(dir, prefix = '') {
 }
 
 /**
+ * Check if path exists (async wrapper)
+ * T4.2: Async existence check
+ * @param {string} filePath - Path to check
+ * @returns {Promise<boolean>}
+ */
+async function pathExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Run init command
+ * T4.2: All file operations converted to async
  * @param {Object} options - Init options
  * @param {boolean} [options.force=false] - Force overwrite without confirmation
  * @returns {Promise<void>}
@@ -103,13 +125,13 @@ export async function runInit(options = {}) {
   const targetDir = getTargetDir();
   
   // Check if template directory exists
-  if (!fs.existsSync(templateDir)) {
+  if (!await pathExists(templateDir)) {
     console.error(`Error: Template directory not found: ${templateDir}`);
     process.exit(1);
   }
   
   // List files to be installed
-  const files = listFiles(templateDir);
+  const files = await listFiles(templateDir);
   console.log('Files to install:');
   for (const file of files) {
     console.log(`  - ${file}`);
@@ -117,7 +139,7 @@ export async function runInit(options = {}) {
   console.log(`\nTarget directory: ${targetDir}`);
   
   // Check if target exists
-  const targetExists = fs.existsSync(targetDir);
+  const targetExists = await pathExists(targetDir);
   
   if (targetExists && !options.force) {
     console.log('\nWarning: Target directory already exists.');
@@ -129,15 +151,15 @@ export async function runInit(options = {}) {
     }
     
     // Remove existing directory
-    fs.rmSync(targetDir, { recursive: true, force: true });
+    await fs.rm(targetDir, { recursive: true, force: true });
   }
   
   // Ensure parent directory exists
   const parentDir = path.dirname(targetDir);
-  fs.mkdirSync(parentDir, { recursive: true });
+  await fs.mkdir(parentDir, { recursive: true });
   
   // Copy files
-  copyDirSync(templateDir, targetDir);
+  await copyDir(templateDir, targetDir);
   
   console.log('\nSuccessfully installed codeagent skill to:');
   console.log(`  ${targetDir}`);

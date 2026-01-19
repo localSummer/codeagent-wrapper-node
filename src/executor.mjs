@@ -13,10 +13,14 @@ import {
   extractCoverageFromLines,
   extractFilesChangedFromLines,
   extractTestResultsFromLines,
-  extractKeyOutputFromLines
+  extractKeyOutputFromLines,
+  extractAllMetrics
 } from './utils.mjs';
 import { nullLogger } from './logger.mjs';
 import { expandHome } from './utils.mjs';
+// T1.2: Static imports instead of dynamic imports
+import { selectBackend } from './backend.mjs';
+import { getAgentConfig } from './agent-config.mjs';
 
 const FORCE_KILL_DELAY = 1000; // 1 second
 const STDERR_BUFFER_SIZE = 4096;
@@ -79,12 +83,14 @@ export async function runTask(taskSpec, backend, options = {}) {
     }, timeout);
   }
 
-  // Set up external abort signal
+  // T2.1: Set up external abort signal with cleanup
+  let abortHandler = null;
   if (externalSignal) {
-    externalSignal.addEventListener('abort', () => {
+    abortHandler = () => {
       interrupted = true;
       terminateProcess(child);
-    });
+    };
+    externalSignal.addEventListener('abort', abortHandler);
   }
 
   // Set up signal handlers
@@ -102,14 +108,16 @@ export async function runTask(taskSpec, backend, options = {}) {
     child.stdin.end();
   }
 
-  // Collect stderr (limited buffer)
-  let stderrBuffer = '';
+  // T3.2: Collect stderr using array buffer instead of string concatenation
+  const stderrChunks = [];
+  let stderrSize = 0;
   child.stderr.on('data', (data) => {
     const chunk = data.toString();
-    stderrBuffer += chunk;
-    // Keep only last N bytes
-    if (stderrBuffer.length > STDERR_BUFFER_SIZE) {
-      stderrBuffer = stderrBuffer.slice(-STDERR_BUFFER_SIZE);
+    stderrChunks.push(chunk);
+    stderrSize += chunk.length;
+    // Periodically clean up old chunks when exceeding buffer size
+    while (stderrSize > STDERR_BUFFER_SIZE * 2 && stderrChunks.length > 1) {
+      stderrSize -= stderrChunks.shift().length;
     }
   });
 
@@ -143,6 +151,10 @@ export async function runTask(taskSpec, backend, options = {}) {
     clearTimeout(timeoutHandle);
   }
   signalHandler.cleanup();
+  // T2.1: Clean up abort signal listener
+  if (abortHandler && externalSignal) {
+    externalSignal.removeEventListener('abort', abortHandler);
+  }
 
   // Determine final exit code
   let finalExitCode = exitCode;
@@ -157,11 +169,11 @@ export async function runTask(taskSpec, backend, options = {}) {
   const filteredMessage = filterOutput(message, parseResult.backendType);
   const lines = filteredMessage.split('\n');
 
-  // Extract structured information
-  const { coverage, coverageNum } = extractCoverageFromLines(lines);
-  const filesChanged = extractFilesChangedFromLines(lines);
-  const { passed: testsPassed, failed: testsFailed } = extractTestResultsFromLines(lines);
-  const keyOutput = extractKeyOutputFromLines(lines);
+  // T1.3: Extract all metrics in a single pass
+  const metrics = extractAllMetrics(lines);
+
+  // T3.2: Build final stderr buffer
+  const stderrBuffer = stderrChunks.join('').slice(-STDERR_BUFFER_SIZE);
 
   logger.info(`Task ${taskId} completed with exit code ${finalExitCode}`);
 
@@ -172,12 +184,12 @@ export async function runTask(taskSpec, backend, options = {}) {
     sessionId: parseResult.sessionId,
     error: finalExitCode !== 0 ? sanitizeOutput(stderrBuffer) : '',
     logPath: logger.path,
-    coverage,
-    coverageNum,
-    filesChanged,
-    keyOutput,
-    testsPassed,
-    testsFailed
+    coverage: metrics.coverage,
+    coverageNum: metrics.coverageNum,
+    filesChanged: metrics.filesChanged,
+    keyOutput: metrics.keyOutput,
+    testsPassed: metrics.testsPassed,
+    testsFailed: metrics.testsFailed
   };
 }
 
@@ -215,6 +227,7 @@ export function terminateProcess(child) {
 
 /**
  * Topologically sort tasks based on dependencies
+ * T2.3: Optimized using queue instead of iterating entire inDegree map each round
  * @param {TaskSpec[]} tasks - Tasks to sort
  * @returns {TaskSpec[][]} Tasks grouped into layers
  * @throws {Error} If circular dependency detected
@@ -237,37 +250,46 @@ export function topologicalSort(tasks) {
     }
   }
 
-  // Kahn's algorithm with layer tracking
+  // T2.3: Initialize queue with all tasks having in-degree 0
+  const queue = [];
+  for (const [id, degree] of inDegree) {
+    if (degree === 0) {
+      queue.push(id);
+    }
+  }
+
+  // T2.3: Kahn's algorithm with optimized layer tracking using queue
   const layers = [];
-  let remaining = tasks.length;
+  let processed = 0;
 
-  while (remaining > 0) {
-    // Find all tasks with in-degree 0
+  while (queue.length > 0) {
+    // Process all current items in queue as one layer
+    const layerSize = queue.length;
     const layer = [];
-    for (const [id, degree] of inDegree) {
-      if (degree === 0) {
-        layer.push(taskMap.get(id));
-        inDegree.set(id, -1); // Mark as processed
-      }
-    }
+    
+    for (let i = 0; i < layerSize; i++) {
+      const id = queue.shift();
+      layer.push(taskMap.get(id));
+      processed++;
 
-    if (layer.length === 0) {
-      const error = new Error('Circular dependency detected');
-      error.exitCode = 2;
-      throw error;
-    }
-
-    // Update in-degrees
-    for (const task of layer) {
-      for (const dependent of adjList.get(task.id)) {
-        if (inDegree.get(dependent) > 0) {
-          inDegree.set(dependent, inDegree.get(dependent) - 1);
+      // Update in-degrees and add newly available tasks to queue
+      for (const dependent of adjList.get(id)) {
+        const newDegree = inDegree.get(dependent) - 1;
+        inDegree.set(dependent, newDegree);
+        if (newDegree === 0) {
+          queue.push(dependent);
         }
       }
     }
 
     layers.push(layer);
-    remaining -= layer.length;
+  }
+
+  // Check for circular dependency
+  if (processed !== tasks.length) {
+    const error = new Error('Circular dependency detected');
+    error.exitCode = 2;
+    throw error;
   }
 
   return layers;
@@ -322,9 +344,7 @@ export async function runParallel(tasks, options = {}) {
     logger = nullLogger 
   } = options;
 
-  // Import backend selector
-  const { selectBackend } = await import('./backend.mjs');
-  const { getAgentConfig } = await import('./agent-config.mjs');
+  // T1.2: Using static imports from top of file (selectBackend, getAgentConfig)
 
   // Topologically sort tasks
   const layers = topologicalSort(tasks);

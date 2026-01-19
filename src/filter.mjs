@@ -2,6 +2,9 @@
  * Output noise filtering
  */
 
+// T3.4: Cache filter functions by backend type to avoid repeated creation
+const filterCache = new Map();
+
 /**
  * Gemini noise patterns to filter
  */
@@ -42,10 +45,16 @@ function matchesAny(line, patterns) {
 
 /**
  * Create a noise filter function
+ * T3.4: Uses cache to avoid recreating filter functions for same backend
  * @param {string} [backend] - Backend name for backend-specific filtering
  * @returns {function(string): boolean} Filter function that returns true if line should be kept
  */
 export function createNoiseFilter(backend = '') {
+  // T3.4: Return cached filter if available
+  if (filterCache.has(backend)) {
+    return filterCache.get(backend);
+  }
+
   let patterns = ALL_NOISE_PATTERNS;
 
   // Use backend-specific patterns if specified
@@ -55,7 +64,12 @@ export function createNoiseFilter(backend = '') {
     patterns = CODEX_NOISE_PATTERNS;
   }
 
-  return (line) => !matchesAny(line, patterns);
+  const filter = (line) => !matchesAny(line, patterns);
+  
+  // T3.4: Cache the filter function
+  filterCache.set(backend, filter);
+  
+  return filter;
 }
 
 /**

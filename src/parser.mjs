@@ -4,6 +4,9 @@
 
 import * as readline from 'readline';
 
+// T2.2: Maximum message size to prevent memory exhaustion (10MB)
+const MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
+
 /**
  * @typedef {Object} UnifiedEvent
  * @property {string} type - Event type
@@ -169,6 +172,7 @@ export async function parseJSONStream(stream, options = {}) {
   });
 
   const messages = [];
+  let messagesSize = 0; // T2.2: Track total message size
   let sessionId = '';
   let detectedBackend = 'unknown';
 
@@ -192,7 +196,11 @@ export async function parseJSONStream(stream, options = {}) {
       // Extract message
       const message = extractMessage(event, detectedBackend);
       if (message) {
-        messages.push(message);
+        // T2.2: Only add message if within size limit
+        if (messagesSize + message.length <= MAX_MESSAGE_SIZE) {
+          messages.push(message);
+          messagesSize += message.length;
+        }
         if (onMessage) {
           onMessage(message);
         }
