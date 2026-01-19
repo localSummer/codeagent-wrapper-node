@@ -8,6 +8,7 @@ import { runTask, runParallel } from './executor.mjs';
 import { createLogger, cleanupOldLogs } from './logger.mjs';
 import { generateFinalOutput } from './utils.mjs';
 import { getAgentConfig, loadModelsConfig } from './agent-config.mjs';
+import { runInit } from './init.mjs';
 import * as readline from 'readline';
 import { createRequire } from 'module';
 
@@ -24,6 +25,7 @@ Usage:
   codeagent-wrapper resume <session_id> <task> [workdir]
   codeagent-wrapper --parallel < tasks.txt
   codeagent-wrapper --cleanup
+  codeagent-wrapper init [--force]
 
 Options:
   --backend <name>      Backend to use (codex, claude, gemini, opencode)
@@ -35,8 +37,12 @@ Options:
   --full-output         Show full output in parallel mode
   --timeout <seconds>   Timeout in seconds (default: 7200)
   --cleanup             Clean up old log files
+  --force               Force overwrite without confirmation (for init)
   --help, -h            Show this help
   --version, -v         Show version
+
+Commands:
+  init                  Install codeagent skill to ~/.claude/skills/
 
 Environment Variables:
   CODEX_TIMEOUT                    Timeout in milliseconds or seconds
@@ -50,6 +56,8 @@ Examples:
   codeagent-wrapper --agent oracle "Review this code"
   codeagent-wrapper resume abc123 "Continue from where we left off"
   echo "Build the project" | codeagent-wrapper -
+  codeagent-wrapper init
+  codeagent-wrapper init --force
 `;
 
 /**
@@ -98,6 +106,13 @@ export async function main(args) {
   if (args.includes('--cleanup')) {
     const count = await cleanupOldLogs();
     console.log(`Cleaned up ${count} old log files`);
+    return;
+  }
+
+  // Handle init command
+  if (args.includes('init')) {
+    const force = args.includes('--force') || args.includes('-f');
+    await runInit({ force });
     return;
   }
 
