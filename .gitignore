@@ -22,4 +22,4 @@ coverage/
 dist/
 build/
 
-**/.CLAUDE.md
+**/CLAUDE.md
