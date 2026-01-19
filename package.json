@@ -1,0 +1,37 @@
+{
+  "name": "codeagent-wrapper",
+  "version": "0.0.1",
+  "description": "Unified wrapper for AI CLI backends (Codex, Claude, Gemini, Opencode)",
+  "main": "./src/main.mjs",
+  "bin": {
+    "codeagent-wrapper": "./bin/codeagent-wrapper.mjs"
+  },
+  "exports": {
+    ".": "./src/main.mjs",
+    "./config": "./src/config.mjs",
+    "./backend": "./src/backend.mjs",
+    "./executor": "./src/executor.mjs",
+    "./logger": "./src/logger.mjs",
+    "./parser": "./src/parser.mjs",
+    "./utils": "./src/utils.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "lint": "echo 'No linter configured'",
+    "start": "node bin/codeagent-wrapper.mjs"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "codex",
+    "claude",
+    "gemini",
+    "opencode",
+    "wrapper"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
