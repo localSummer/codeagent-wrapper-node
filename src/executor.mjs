@@ -258,17 +258,18 @@ export function topologicalSort(tasks) {
     }
   }
 
-  // T2.3: Kahn's algorithm with optimized layer tracking using queue
+  // T2.3: Kahn's algorithm with optimized layer tracking using queue + head index
   const layers = [];
   let processed = 0;
+  let head = 0;
 
-  while (queue.length > 0) {
-    // Process all current items in queue as one layer
-    const layerSize = queue.length;
+  while (head < queue.length) {
+    // Snapshot current queue end to form a layer
+    const layerEnd = queue.length;
     const layer = [];
-    
-    for (let i = 0; i < layerSize; i++) {
-      const id = queue.shift();
+
+    while (head < layerEnd) {
+      const id = queue[head++];
       layer.push(taskMap.get(id));
       processed++;
 

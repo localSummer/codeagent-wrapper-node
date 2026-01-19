@@ -132,7 +132,7 @@ codeagent-wrapper --cleanup
 |----------|-------------|
 | `CODEX_TIMEOUT` | Timeout in milliseconds or seconds |
 | `CODEAGENT_SKIP_PERMISSIONS` | Skip permissions if set |
-| `CODEAGENT_MAX_PARALLEL_WORKERS` | Max parallel workers (0 = unlimited) |
+| `CODEAGENT_MAX_PARALLEL_WORKERS` | Max parallel workers (0 = unlimited, default: min(100, cpuCount*4)) |
 | `CODEAGENT_ASCII_MODE` | Use ASCII symbols instead of Unicode |
 | `CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS` | Logger close timeout (default: 5000) |
 

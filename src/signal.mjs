@@ -25,9 +25,12 @@ export function setupSignalHandlers(onSignal) {
     signals.push('SIGHUP');
   }
 
+  const listeners = new Map();
   for (const signal of signals) {
     try {
-      process.on(signal, () => handler(signal));
+      const listener = () => handler(signal);
+      listeners.set(signal, listener);
+      process.on(signal, listener);
     } catch {
       // Ignore if signal not supported
     }
@@ -37,7 +40,10 @@ export function setupSignalHandlers(onSignal) {
     cleanup: () => {
       for (const signal of signals) {
         try {
-          process.removeListener(signal, handler);
+          const listener = listeners.get(signal);
+          if (listener) {
+            process.removeListener(signal, listener);
+          }
         } catch {
           // Ignore
         }

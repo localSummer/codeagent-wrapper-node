@@ -4,7 +4,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { parseCliArgs, parseParallelConfig, validateConfig, loadEnvConfig } from '../src/config.mjs';
+import { parseCliArgs, parseParallelConfig, parseParallelConfigStream, validateConfig, loadEnvConfig } from '../src/config.mjs';
+import { Readable } from 'node:stream';
 
 describe('parseCliArgs', () => {
   it('should parse basic task', () => {
@@ -79,6 +80,31 @@ dependencies: build
 Run tests
 `;
     const config = parseParallelConfig(input);
+    assert.strictEqual(config.tasks.length, 2);
+    assert.strictEqual(config.tasks[0].id, 'build');
+    assert.strictEqual(config.tasks[0].backend, 'codex');
+    assert.strictEqual(config.tasks[1].id, 'test');
+    assert.deepStrictEqual(config.tasks[1].dependencies, ['build']);
+  });
+});
+
+describe('parseParallelConfigStream', () => {
+  it('should parse parallel task format from stream', async () => {
+    const input = `
+---TASK---
+id: build
+workdir: /app
+backend: codex
+---CONTENT---
+Build the project
+---TASK---
+id: test
+dependencies: build
+---CONTENT---
+Run tests
+`;
+    const stream = Readable.from([input]);
+    const config = await parseParallelConfigStream(stream);
     assert.strictEqual(config.tasks.length, 2);
     assert.strictEqual(config.tasks[0].id, 'build');
     assert.strictEqual(config.tasks[0].backend, 'codex');

@@ -3,6 +3,8 @@
  */
 
 import * as path from 'path';
+import * as os from 'os';
+import * as readline from 'readline';
 import { expandHome, isValidSessionId } from './utils.mjs';
 
 /**
@@ -45,6 +47,18 @@ import { expandHome, isValidSessionId } from './utils.mjs';
  */
 
 /**
+ * Get default max parallel workers based on CPU, capped at 100
+ * @returns {number}
+ */
+export function getDefaultMaxParallelWorkers() {
+  const cpuCount = os.cpus?.().length || 1;
+  const adaptive = Math.max(1, cpuCount * 4);
+  return Math.min(100, adaptive);
+}
+
+const DEFAULT_MAX_PARALLEL_WORKERS = getDefaultMaxParallelWorkers();
+
+/**
  * Default configuration values
  */
 const DEFAULT_CONFIG = {
@@ -61,7 +75,7 @@ const DEFAULT_CONFIG = {
   promptFile: '',
   skipPermissions: false,
   yolo: false,
-  maxParallelWorkers: 0,
+  maxParallelWorkers: DEFAULT_MAX_PARALLEL_WORKERS,
   parallel: false,
   fullOutput: false
 };
@@ -150,62 +164,134 @@ export function parseParallelConfig(input) {
 
     const headerLines = parts[0].trim().split('\n');
     const content = parts[1].trim();
-
-    const task = {
-      id: '',
-      task: content,
-      workDir: process.cwd(),
-      dependencies: [],
-      sessionId: '',
-      backend: '',
-      model: '',
-      agent: '',
-      promptFile: '',
-      skipPermissions: false
-    };
-
-    // Parse header
-    for (const line of headerLines) {
-      const colonIndex = line.indexOf(':');
-      if (colonIndex === -1) continue;
-
-      const key = line.slice(0, colonIndex).trim().toLowerCase();
-      const value = line.slice(colonIndex + 1).trim();
-
-      switch (key) {
-        case 'id':
-          task.id = value;
-          break;
-        case 'workdir':
-          task.workDir = path.resolve(expandHome(value));
-          break;
-        case 'session_id':
-          task.sessionId = value;
-          break;
-        case 'backend':
-          task.backend = value;
-          break;
-        case 'model':
-          task.model = value;
-          break;
-        case 'agent':
-          task.agent = value;
-          break;
-        case 'dependencies':
-          task.dependencies = value.split(',').map(d => d.trim()).filter(Boolean);
-          break;
-        case 'skip_permissions':
-          task.skipPermissions = value.toLowerCase() === 'true';
-          break;
-      }
-    }
-
-    if (task.id && task.task) {
-      tasks.push(task);
-    }
+    const task = buildTaskFromBlock(headerLines, content);
+    if (task) tasks.push(task);
   }
 
   return { tasks };
+}
+
+/**
+ * Parse parallel configuration from a readable stream (streaming, tolerant)
+ * @param {import('stream').Readable} stream - Input stream
+ * @returns {Promise<ParallelConfig>}
+ */
+export async function parseParallelConfigStream(stream) {
+  const tasks = [];
+  const rl = readline.createInterface({
+    input: stream,
+    crlfDelay: Infinity
+  });
+
+  let inHeader = false;
+  let inContent = false;
+  let headerLines = [];
+  let contentLines = [];
+
+  const flush = () => {
+    if (!inContent) {
+      headerLines = [];
+      contentLines = [];
+      return;
+    }
+    const content = contentLines.join('\n').trim();
+    const task = buildTaskFromBlock(headerLines, content);
+    if (task) tasks.push(task);
+    headerLines = [];
+    contentLines = [];
+    inHeader = false;
+    inContent = false;
+  };
+
+  for await (const line of rl) {
+    const trimmed = line.trim();
+
+    if (trimmed === '---TASK---') {
+      flush();
+      inHeader = true;
+      inContent = false;
+      continue;
+    }
+
+    if (trimmed === '---CONTENT---') {
+      if (inHeader) {
+        inContent = true;
+        inHeader = false;
+      }
+      continue;
+    }
+
+    if (inContent) {
+      contentLines.push(line);
+    } else if (inHeader) {
+      headerLines.push(line);
+    }
+  }
+
+  flush();
+
+  return { tasks };
+}
+
+/**
+ * Build task spec from header lines and content
+ * @param {string[]} headerLines - Header lines
+ * @param {string} content - Task content
+ * @returns {TaskSpec|null}
+ */
+function buildTaskFromBlock(headerLines, content) {
+  if (!content) return null;
+
+  const task = {
+    id: '',
+    task: content,
+    workDir: process.cwd(),
+    dependencies: [],
+    sessionId: '',
+    backend: '',
+    model: '',
+    agent: '',
+    promptFile: '',
+    skipPermissions: false
+  };
+
+  for (const line of headerLines) {
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const key = line.slice(0, colonIndex).trim().toLowerCase();
+    const value = line.slice(colonIndex + 1).trim();
+
+    switch (key) {
+      case 'id':
+        task.id = value;
+        break;
+      case 'workdir':
+        task.workDir = path.resolve(expandHome(value));
+        break;
+      case 'session_id':
+        task.sessionId = value;
+        break;
+      case 'backend':
+        task.backend = value;
+        break;
+      case 'model':
+        task.model = value;
+        break;
+      case 'agent':
+        task.agent = value;
+        break;
+      case 'dependencies':
+        task.dependencies = value.split(',').map(d => d.trim()).filter(Boolean);
+        break;
+      case 'skip_permissions':
+        task.skipPermissions = value.toLowerCase() === 'true';
+        break;
+    }
+  }
+
+  if (!task.id) return null;
+  return task;
 }
 
 /**

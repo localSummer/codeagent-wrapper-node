@@ -82,6 +82,7 @@ export class Logger {
   #flushTimer = null;
   #closed = false;
   #pendingWrites = 0;
+  #drainPending = false;
 
   /**
    * Create a new Logger
@@ -90,6 +91,10 @@ export class Logger {
   constructor(logPath) {
     this.#path = logPath;
     this.#stream = fs.createWriteStream(logPath, { flags: 'a' });
+    this.#stream.on('drain', () => {
+      this.#drainPending = false;
+      this.#flush();
+    });
     this.#startFlushTimer();
   }
 
@@ -153,15 +158,18 @@ export class Logger {
    * Flush pending log entries to file
    */
   #flush() {
-    if (this.#queue.length === 0 || !this.#stream) return;
+    if (this.#queue.length === 0 || !this.#stream || this.#drainPending) return;
 
     const entries = this.#queue.splice(0);
     const text = entries.join('\n') + '\n';
     
     this.#pendingWrites++;
-    this.#stream.write(text, () => {
+    const canWrite = this.#stream.write(text, () => {
       this.#pendingWrites--;
     });
+    if (!canWrite) {
+      this.#drainPending = true;
+    }
   }
 
   /**
@@ -221,6 +229,7 @@ export class Logger {
     }
 
     // Final flush
+    this.#drainPending = false;
     this.#flush();
 
     // Wait for pending writes with timeout

@@ -2,7 +2,7 @@
  * Main module - CLI entry point and orchestration
  */
 
-import { parseCliArgs, parseParallelConfig, validateConfig, loadEnvConfig } from './config.mjs';
+import { parseCliArgs, parseParallelConfigStream, validateConfig, loadEnvConfig } from './config.mjs';
 import { selectBackend } from './backend.mjs';
 import { runTask, runParallel } from './executor.mjs';
 import { createLogger, cleanupOldLogs } from './logger.mjs';
@@ -47,7 +47,7 @@ Commands:
 Environment Variables:
   CODEX_TIMEOUT                    Timeout in milliseconds or seconds
   CODEAGENT_SKIP_PERMISSIONS       Skip permissions if set
-  CODEAGENT_MAX_PARALLEL_WORKERS   Max parallel workers (0 = unlimited)
+  CODEAGENT_MAX_PARALLEL_WORKERS   Max parallel workers (0 = unlimited, default: min(100, cpuCount*4))
   CODEAGENT_ASCII_MODE             Use ASCII symbols instead of Unicode
 
 Examples:
@@ -78,11 +78,11 @@ async function readStdinTask() {
 }
 
 /**
- * Read parallel config from stdin
- * @returns {Promise<string>}
+ * Read parallel config from stdin (streaming parse)
+ * @returns {Promise<import('./config.mjs').ParallelConfig>}
  */
 async function readParallelInput() {
-  return readStdinTask();
+  return parseParallelConfigStream(process.stdin);
 }
 
 /**
@@ -122,12 +122,11 @@ export async function main(args) {
   // Parse configuration
   const envConfig = loadEnvConfig();
   let config = parseCliArgs(args);
-  config = { ...envConfig, ...config };
+  config = applyEnvConfigOverrides(config, envConfig, args);
 
   // Handle parallel mode
   if (config.parallel) {
-    const input = await readParallelInput();
-    const parallelConfig = parseParallelConfig(input);
+    const parallelConfig = await readParallelInput();
     const logger = createLogger('parallel');
 
     try {
@@ -215,4 +214,32 @@ export async function main(args) {
   } finally {
     await logger.close();
   }
+}
+
+/**
+ * Apply environment config values without overriding explicit CLI flags
+ * @param {import('./config.mjs').Config} config
+ * @param {Partial<import('./config.mjs').Config>} envConfig
+ * @param {string[]} args
+ * @returns {import('./config.mjs').Config}
+ */
+function applyEnvConfigOverrides(config, envConfig, args) {
+  const merged = { ...config };
+  const hasTimeoutFlag = args.includes('--timeout');
+  const hasSkipFlag = args.includes('--skip-permissions') || args.includes('--yolo');
+
+  if (Number.isFinite(envConfig.timeout) && !hasTimeoutFlag) {
+    merged.timeout = envConfig.timeout;
+  }
+
+  if (envConfig.skipPermissions && !hasSkipFlag) {
+    merged.skipPermissions = true;
+    merged.yolo = true;
+  }
+
+  if (Number.isFinite(envConfig.maxParallelWorkers)) {
+    merged.maxParallelWorkers = envConfig.maxParallelWorkers;
+  }
+
+  return merged;
 }
