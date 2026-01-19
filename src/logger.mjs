@@ -13,6 +13,23 @@ const QUEUE_SIZE = 1000;
 const CLOSE_TIMEOUT_MS = parseInt(process.env.CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS || '5000', 10);
 
 /**
+ * Get the log directory path
+ * Creates ~/.codeagent/logs if it doesn't exist
+ * @returns {string}
+ */
+function getLogDir() {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || os.homedir();
+  const logDir = path.join(homeDir, '.codeagent', 'logs');
+  
+  // Ensure directory exists (sync for simplicity at startup)
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  
+  return logDir;
+}
+
+/**
  * Async Logger class
  */
 export class Logger {
@@ -192,13 +209,13 @@ export class Logger {
 export function createLogger(suffix = '') {
   const wrapperName = getWrapperName();
   const pid = process.pid;
-  const tmpDir = os.tmpdir();
+  const logDir = getLogDir();
   
   const filename = suffix 
     ? `${wrapperName}-${pid}-${suffix}.log`
     : `${wrapperName}-${pid}.log`;
   
-  const logPath = path.join(tmpDir, filename);
+  const logPath = path.join(logDir, filename);
   return new Logger(logPath);
 }
 
@@ -236,29 +253,29 @@ async function isSymlink(filepath) {
  */
 export async function cleanupOldLogs() {
   const wrapperName = getWrapperName();
-  const tmpDir = os.tmpdir();
+  const logDir = getLogDir();
   const pattern = new RegExp(`^${wrapperName}-(\\d+)(?:-[^.]+)?\\.log$`);
   
   let cleanedCount = 0;
 
   try {
-    const files = await fs.promises.readdir(tmpDir);
+    const files = await fs.promises.readdir(logDir);
     
     for (const file of files) {
       const match = file.match(pattern);
       if (!match) continue;
 
       const pid = parseInt(match[1], 10);
-      const filepath = path.join(tmpDir, file);
+      const filepath = path.join(logDir, file);
 
       // Security: skip symlinks
       if (await isSymlink(filepath)) {
         continue;
       }
 
-      // Security: ensure file is within tmpDir
+      // Security: ensure file is within logDir
       const realPath = await fs.promises.realpath(filepath).catch(() => null);
-      if (!realPath || !realPath.startsWith(tmpDir)) {
+      if (!realPath || !realPath.startsWith(logDir)) {
         continue;
       }
 
