@@ -110,6 +110,10 @@ codeagent-wrapper --version
 
 # Clean up old log files
 codeagent-wrapper --cleanup
+
+# 安装 codeagent skill 并写入默认 models.json
+codeagent-wrapper init
+codeagent-wrapper init --force
 ```
 
 ## Options
@@ -137,6 +141,8 @@ codeagent-wrapper --cleanup
 | `CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS` | Logger close timeout (default: 5000) |
 
 ## Custom Agent Configuration
+
+运行 `codeagent-wrapper init` 会在 `~/.codeagent/models.json` 写入默认配置（文件不存在时创建，`--force` 会覆盖）。
 
 Create `~/.codeagent/models.json`:
 

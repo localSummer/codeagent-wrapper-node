@@ -24,7 +24,7 @@ import { expandHome } from './utils.mjs';
 /**
  * Default agent configurations
  */
-const DEFAULT_MODELS_CONFIG = {
+export const DEFAULT_MODELS_CONFIG = {
   defaultBackend: 'opencode',
   defaultModel: 'opencode/grok-code',
   agents: {

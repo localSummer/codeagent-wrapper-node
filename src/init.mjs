@@ -4,10 +4,11 @@
  */
 
 import * as fs from 'fs/promises';
-import { existsSync } from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { fileURLToPath } from 'url';
+import { DEFAULT_MODELS_CONFIG } from './agent-config.mjs';
+import { expandHome } from './utils.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +28,14 @@ function getTemplateDir() {
 function getTargetDir() {
   const homeDir = process.env.HOME || process.env.USERPROFILE;
   return path.join(homeDir, '.claude', 'skills', 'codeagent');
+}
+
+/**
+ * Get the models config file path
+ * @returns {string}
+ */
+function getModelsConfigPath() {
+  return expandHome('~/.codeagent/models.json');
 }
 
 /**
@@ -114,6 +123,27 @@ async function pathExists(filePath) {
 }
 
 /**
+ * Write default models config to ~/.codeagent/models.json
+ * @param {Object} options - Write options
+ * @param {boolean} [options.force=false] - Force overwrite if file exists
+ * @returns {Promise<{path: string, skipped: boolean}>}
+ */
+async function writeDefaultModelsConfig(options = {}) {
+  const configPath = getModelsConfigPath();
+  const configDir = path.dirname(configPath);
+  const exists = await pathExists(configPath);
+
+  if (exists && !options.force) {
+    return { path: configPath, skipped: true };
+  }
+
+  await fs.mkdir(configDir, { recursive: true });
+  const content = JSON.stringify(DEFAULT_MODELS_CONFIG, null, 2);
+  await fs.writeFile(configPath, `${content}\n`, 'utf-8');
+  return { path: configPath, skipped: false };
+}
+
+/**
  * Run init command
  * T4.2: All file operations converted to async
  * @param {Object} options - Init options
@@ -163,4 +193,13 @@ export async function runInit(options = {}) {
   
   console.log('\nSuccessfully installed codeagent skill to:');
   console.log(`  ${targetDir}`);
+
+  const modelsResult = await writeDefaultModelsConfig({ force: options.force });
+  if (modelsResult.skipped) {
+    console.log('\nModels config already exists:');
+    console.log(`  ${modelsResult.path}`);
+  } else {
+    console.log('\nDefault models config written to:');
+    console.log(`  ${modelsResult.path}`);
+  }
 }
