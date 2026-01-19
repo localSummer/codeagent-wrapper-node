@@ -21,3 +21,5 @@ coverage/
 # Build artifacts
 dist/
 build/
+
+**/.CLAUDE.md
