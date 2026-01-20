@@ -134,7 +134,12 @@ async function writeDefaultModelsConfig(options = {}) {
   const exists = await pathExists(configPath);
 
   if (exists && !options.force) {
-    return { path: configPath, skipped: true };
+    console.log(`\nWarning: Models config already exists: ${configPath}`);
+    const shouldOverwrite = await confirm('Do you want to overwrite?');
+    if (!shouldOverwrite) {
+      console.log('Models config skipped.');
+      return { path: configPath, skipped: true };
+    }
   }
 
   await fs.mkdir(configDir, { recursive: true });
@@ -195,10 +200,7 @@ export async function runInit(options = {}) {
   console.log(`  ${targetDir}`);
 
   const modelsResult = await writeDefaultModelsConfig({ force: options.force });
-  if (modelsResult.skipped) {
-    console.log('\nModels config already exists:');
-    console.log(`  ${modelsResult.path}`);
-  } else {
+  if (!modelsResult.skipped) {
     console.log('\nDefault models config written to:');
     console.log(`  ${modelsResult.path}`);
   }

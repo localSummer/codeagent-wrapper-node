@@ -61,7 +61,7 @@ class ClaudeBackend {
     const args = ['-p', '--output-format', 'stream-json'];
 
     if (config.skipPermissions) {
-      args.push('--skip-permissions');
+      args.push('--dangerously-skip-permissions');
     }
 
     if (config.model) {

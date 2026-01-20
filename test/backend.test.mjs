@@ -75,10 +75,10 @@ describe('ClaudeBackend.buildArgs', () => {
     assert.ok(args.includes('my task'));
   });
 
-  it('should include --skip-permissions', () => {
+  it('should include --dangerously-skip-permissions', () => {
     const backend = selectBackend('claude');
     const args = backend.buildArgs({ skipPermissions: true }, 'task');
-    assert.ok(args.includes('--skip-permissions'));
+    assert.ok(args.includes('--dangerously-skip-permissions'));
   });
 
   it('should include model', () => {
