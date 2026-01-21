@@ -96,7 +96,17 @@ export function extractMessage(event, backendType) {
             return '';
           }
         }
-        return event.part.text || event.part.content || '';
+        // Text message
+        if (event.part.text) {
+          return event.part.text;
+        }
+        if (event.part.content) {
+          return event.part.content;
+        }
+        // Tool call result - extract from part.state.output
+        if (event.part.type === 'tool' && event.part.state && event.part.state.output) {
+          return event.part.state.output;
+        }
       }
       return '';
 

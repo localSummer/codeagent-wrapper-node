@@ -52,6 +52,46 @@ describe('extractMessage', () => {
     const event = { part: { text: 'Hello Opencode' } };
     assert.strictEqual(extractMessage(event, 'opencode'), 'Hello Opencode');
   });
+
+  it('should extract tool call output from opencode event', () => {
+    const event = {
+      type: 'tool_use',
+      part: {
+        type: 'tool',
+        callID: 'call_123',
+        tool: 'bash',
+        state: {
+          status: 'completed',
+          input: { command: 'ls', description: 'List files' },
+          output: 'file1.txt\nfile2.txt'
+        }
+      }
+    };
+    assert.strictEqual(extractMessage(event, 'opencode'), 'file1.txt\nfile2.txt');
+  });
+
+  it('should return empty string for opencode tool event without output', () => {
+    const event = {
+      type: 'tool_use',
+      part: {
+        type: 'tool',
+        callID: 'call_123',
+        state: { status: 'pending' }
+      }
+    };
+    assert.strictEqual(extractMessage(event, 'opencode'), '');
+  });
+
+  it('should prefer text over tool output for opencode event', () => {
+    const event = {
+      part: {
+        text: 'Text message',
+        type: 'tool',
+        state: { output: 'Tool output' }
+      }
+    };
+    assert.strictEqual(extractMessage(event, 'opencode'), 'Text message');
+  });
 });
 
 describe('extractSessionId', () => {
