@@ -38,14 +38,50 @@ describe('extractMessage', () => {
     assert.strictEqual(extractMessage(event, 'codex'), 'Hello');
   });
 
+  it('should extract command execution output from codex event', () => {
+    const event = {
+      type: 'item.completed',
+      item: {
+        type: 'command_execution',
+        command: 'echo hello',
+        aggregated_output: 'hello\n',
+        exit_code: 0,
+        status: 'completed'
+      }
+    };
+    assert.strictEqual(extractMessage(event, 'codex'), 'hello\n');
+  });
+
   it('should extract message from claude event', () => {
     const event = { result: 'Hello Claude' };
     assert.strictEqual(extractMessage(event, 'claude'), 'Hello Claude');
   });
 
+  it('should extract tool result stdout from claude event', () => {
+    const event = {
+      type: 'user',
+      tool_use_result: {
+        stdout: 'hello',
+        stderr: '',
+        interrupted: false
+      }
+    };
+    assert.strictEqual(extractMessage(event, 'claude'), 'hello');
+  });
+
   it('should extract message from gemini event', () => {
     const event = { content: 'Hello Gemini' };
     assert.strictEqual(extractMessage(event, 'gemini'), 'Hello Gemini');
+  });
+
+  it('should extract tool result output from gemini event', () => {
+    const event = {
+      type: 'tool_result',
+      tool_id: 'run_shell_command-123',
+      status: 'success',
+      output: 'hello'
+    };
+    assert.strictEqual(extractMessage(event, 'gemini'), 'hello');
   });
 
   it('should extract message from opencode event', () => {

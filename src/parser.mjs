@@ -76,15 +76,45 @@ export function extractMessage(event, backendType) {
             return '';
           }
         }
-        return event.item.content || event.item.text || '';
+        // Text message
+        if (event.item.content) {
+          return event.item.content;
+        }
+        if (event.item.text) {
+          return event.item.text;
+        }
+        // Command execution result
+        if (event.item.type === 'command_execution' && event.item.aggregated_output) {
+          return event.item.aggregated_output;
+        }
       }
       return '';
 
     case 'claude':
-      return event.result || event.content || '';
+      // Final result
+      if (event.result) {
+        return event.result;
+      }
+      // Text content
+      if (event.content) {
+        return event.content;
+      }
+      // Tool call result
+      if (event.tool_use_result && event.tool_use_result.stdout) {
+        return event.tool_use_result.stdout;
+      }
+      return '';
 
     case 'gemini':
-      return event.content || '';
+      // Text content
+      if (event.content) {
+        return event.content;
+      }
+      // Tool call result
+      if (event.type === 'tool_result' && event.output) {
+        return event.output;
+      }
+      return '';
 
     case 'opencode':
       if (event.part) {
