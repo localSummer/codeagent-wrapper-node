@@ -23,3 +23,8 @@ dist/
 build/
 
 **/CLAUDE.md
+
+.claude
+.github
+openspec
+AGENTS.md
