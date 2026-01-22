@@ -26,11 +26,116 @@ const FORCE_KILL_DELAY = 1000; // 1 second
 const STDERR_BUFFER_SIZE = 4096;
 
 /**
+ * Task execution progress stages
+ */
+export const ProgressStage = {
+  STARTED: 'started',    // 任务开始
+  ANALYZING: 'analyzing', // 分析/思考阶段
+  EXECUTING: 'executing', // 执行/工具调用阶段
+  COMPLETED: 'completed'  // 任务完成
+};
+
+/**
+ * @typedef {Object} ProgressEvent
+ * @property {string} stage - Progress stage (ProgressStage)
+ * @property {string} message - Progress message
+ * @property {string} backend - Backend type
+ * @property {object} [details] - Additional details
+ */
+
+/**
  * @typedef {import('./config.mjs').TaskSpec} TaskSpec
  * @typedef {import('./config.mjs').TaskResult} TaskResult
  * @typedef {import('./backend.mjs').Backend} Backend
  * @typedef {import('./logger.mjs').Logger} Logger
  */
+
+/**
+ * Detect progress from event based on backend type
+ * @param {object} event - Parsed event
+ * @param {string} backendType - Backend type
+ * @returns {ProgressEvent|null}
+ */
+function detectProgressFromEvent(event, backendType) {
+  switch (backendType) {
+    case 'claude':
+      // Claude: 利用 subtype 判断阶段
+      if (event.subtype === 'tool_use') {
+        return {
+          stage: ProgressStage.EXECUTING,
+          message: `Using tool: ${event.name || 'unknown'}`,
+          backend: backendType,
+          details: { toolName: event.name }
+        };
+      }
+      if (event.subtype === 'tool_result') {
+        return {
+          stage: ProgressStage.EXECUTING,
+          message: 'Tool completed',
+          backend: backendType
+        };
+      }
+      break;
+
+    case 'opencode':
+      // Opencode: 从 part.state 提取状态
+      if (event.part?.state) {
+        const stateMap = {
+          'input': ProgressStage.ANALYZING,
+          'running': ProgressStage.EXECUTING,
+          'completed': ProgressStage.COMPLETED,
+          'error': ProgressStage.COMPLETED
+        };
+        const stage = stateMap[event.part.state] || ProgressStage.EXECUTING;
+        return {
+          stage,
+          message: `State: ${event.part.state}`,
+          backend: backendType,
+          details: { state: event.part.state }
+        };
+      }
+      break;
+
+    case 'codex':
+      // Codex: 从 item.type 判断
+      if (event.type === 'command_execution') {
+        return {
+          stage: ProgressStage.EXECUTING,
+          message: event.item?.command || 'Running command',
+          backend: backendType,
+          details: { command: event.item?.command }
+        };
+      }
+      if (event.item?.type === 'message' && !event.item.content?.startsWith('Thinking')) {
+        return {
+          stage: ProgressStage.ANALYZING,
+          message: 'Analyzing...',
+          backend: backendType
+        };
+      }
+      break;
+
+    case 'gemini':
+      // Gemini: 从 type 和 delta 判断
+      if (event.type === 'tool_use' || event.tool_use) {
+        return {
+          stage: ProgressStage.EXECUTING,
+          message: 'Using tool',
+          backend: backendType
+        };
+      }
+      if (event.role === 'model' && event.delta) {
+        return {
+          stage: ProgressStage.ANALYZING,
+          message: 'Generating response...',
+          backend: backendType
+        };
+      }
+      break;
+  }
+
+  return null;
+}
 
 /**
  * Run a single task
@@ -40,17 +145,32 @@ const STDERR_BUFFER_SIZE = 4096;
  * @param {number} [options.timeout] - Timeout in milliseconds
  * @param {Logger} [options.logger] - Logger instance
  * @param {AbortSignal} [options.signal] - Abort signal
+ * @param {function(ProgressEvent): void} [options.onProgress] - Progress callback
  * @returns {Promise<TaskResult>}
  */
 export async function runTask(taskSpec, backend, options = {}) {
-  const { 
-    timeout = 7200000, 
+  const {
+    timeout = 7200000,
     logger = nullLogger,
-    signal: externalSignal 
+    signal: externalSignal,
+    onProgress = null
   } = options;
 
   const taskId = taskSpec.id || 'main';
   logger.info(`Starting task: ${taskId}`);
+
+  // Notify task started
+  if (onProgress) {
+    try {
+      onProgress({
+        stage: ProgressStage.STARTED,
+        message: `Task ${taskId} started`,
+        backend: backend.name()
+      });
+    } catch (error) {
+      logger.error(`Progress callback error: ${error.message}`);
+    }
+  }
 
   // Load and inject prompt file content if specified
   let effectiveTask = taskSpec.task;
@@ -139,6 +259,19 @@ export async function runTask(taskSpec, backend, options = {}) {
   let parseResult;
   try {
     parseResult = await parseJSONStream(child.stdout, {
+      onEvent: (event, backendType) => {
+        // Progress detection
+        if (onProgress) {
+          try {
+            const progress = detectProgressFromEvent(event, backendType);
+            if (progress) {
+              onProgress(progress);
+            }
+          } catch (error) {
+            logger.error(`Progress detection error: ${error.message}`);
+          }
+        }
+      },
       onMessage: (msg) => {
         logger.debug(`Message: ${msg.slice(0, 100)}`);
       }
@@ -190,6 +323,19 @@ export async function runTask(taskSpec, backend, options = {}) {
   const stderrBuffer = stderrChunks.join('').slice(-STDERR_BUFFER_SIZE);
 
   logger.info(`Task ${taskId} completed with exit code ${finalExitCode}`);
+
+  // Notify task completed
+  if (onProgress) {
+    try {
+      onProgress({
+        stage: ProgressStage.COMPLETED,
+        message: `Task ${taskId} completed with exit code ${finalExitCode}`,
+        backend: backend.name()
+      });
+    } catch (error) {
+      logger.error(`Progress completed callback error: ${error.message}`);
+    }
+  }
 
   return {
     taskId,
