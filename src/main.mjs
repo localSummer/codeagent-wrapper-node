@@ -4,7 +4,7 @@
 
 import { parseCliArgs, parseParallelConfigStream, validateConfig, loadEnvConfig } from './config.mjs';
 import { selectBackend } from './backend.mjs';
-import { runTask, runParallel } from './executor.mjs';
+import { runTask, runParallel, ProgressStage } from './executor.mjs';
 import { createLogger, cleanupOldLogs } from './logger.mjs';
 import { generateFinalOutput } from './utils.mjs';
 import { getAgentConfig, loadModelsConfig } from './agent-config.mjs';
@@ -27,37 +27,65 @@ Usage:
   codeagent-wrapper --cleanup
   codeagent-wrapper init [--force]
 
+Required Arguments:
+  task                 Task description (or "-" to read from stdin)
+
+Optional Arguments:
+  workdir              Working directory (default: current directory)
+
 Options:
-  --backend <name>      Backend to use (codex, claude, gemini, opencode)
-  --model <model>       Model to use
-  --agent <name>        Agent configuration name
-  --prompt-file <path>  Path to prompt file
-  --skip-permissions    Skip permission checks (YOLO mode)
-  --parallel            Run tasks in parallel mode
-  --full-output         Show full output in parallel mode
-  --timeout <seconds>   Timeout in seconds (default: 7200)
-  --cleanup             Clean up old log files
-  --force               Force overwrite without confirmation (for init)
-  --help, -h            Show this help
-  --version, -v         Show version
+  --backend <name>     Backend to use: codex, claude, gemini, opencode
+  --model <model>      Model to use (backend-specific)
+  --agent <name>       Agent configuration name (from ~/.codeagent/models.json)
+  --prompt-file <path> Path to prompt file
+  --timeout <seconds>  Timeout in seconds (default: 7200, max: 86400)
+  --reasoning-effort   Reasoning effort level (claude only: low, medium, high)
+  --skip-permissions   Skip permission checks (YOLO mode)
+  --backend-output     Forward backend output to terminal (for debugging)
+  --parallel           Run tasks in parallel mode
+  --full-output        Show full output in parallel mode
+  --quiet, -q          Disable real-time progress output
+  --cleanup            Clean up old log files
+  --force              Force overwrite without confirmation (for init)
+  --help, -h           Show this help
+  --version, -v        Show version
 
 Commands:
-  init                  Install codeagent skill to ~/.claude/skills/
+  init                 Install codeagent skill to ~/.claude/skills/
+  resume <id>          Resume a previous session
 
 Environment Variables:
   CODEX_TIMEOUT                    Timeout in milliseconds or seconds
   CODEAGENT_SKIP_PERMISSIONS       Skip permissions if set
-  CODEAGENT_MAX_PARALLEL_WORKERS   Max parallel workers (0 = unlimited, default: min(100, cpuCount*4))
+  CODEAGENT_MAX_PARALLEL_WORKERS   Max parallel workers (default: min(100, cpuCount*4))
+  CODEAGENT_QUIET                  Disable progress output if set
   CODEAGENT_ASCII_MODE             Use ASCII symbols instead of Unicode
 
 Examples:
+  # Basic usage
   codeagent-wrapper "Fix the bug in auth.js"
-  codeagent-wrapper --backend claude "Add tests" ./src
+
+  # Specify backend and model
+  codeagent-wrapper --backend claude --model sonnet "Add tests" ./src
+
+  # Use agent configuration
   codeagent-wrapper --agent oracle "Review this code"
-  codeagent-wrapper resume abc123 "Continue from where we left off"
+
+  # Read task from stdin
   echo "Build the project" | codeagent-wrapper -
-  codeagent-wrapper init
-  codeagent-wrapper init --force
+
+  # Resume previous session
+  codeagent-wrapper resume abc123 "Continue from where we left off"
+
+  # Debug backend output
+  codeagent-wrapper --backend-output "Debug this issue"
+
+  # Parallel task execution
+  codeagent-wrapper --parallel < tasks.txt
+
+Documentation:
+  GitHub: https://github.com/anthropics/codeagent-wrapper
+  Issues: https://github.com/anthropics/codeagent-wrapper/issues
 `;
 
 /**
@@ -84,6 +112,74 @@ async function readStdinTask() {
 async function readParallelInput() {
   return parseParallelConfigStream(process.stdin);
 }
+
+/**
+ * Stage emoji mapping
+ */
+const STAGE_EMOJIS = {
+  [ProgressStage.STARTED]: '⏳',
+  [ProgressStage.ANALYZING]: '🔍',
+  [ProgressStage.EXECUTING]: '⚡',
+  [ProgressStage.COMPLETED]: '✓'
+};
+
+/**
+ * ANSI color codes
+ */
+const COLORS = {
+  GREEN: '\x1b[32m',
+  YELLOW: '\x1b[33m',
+  CYAN: '\x1b[36m',
+  RESET: '\x1b[0m'
+};
+
+/**
+ * Format progress event for console output
+ * @param {string} stage - Progress stage
+ * @param {string} taskId - Task identifier
+ * @param {number} elapsed - Elapsed time in ms
+ * @param {object} [details] - Additional details
+ * @returns {string}
+ */
+function formatProgress(stage, taskId, elapsed, details = {}) {
+  const emoji = STAGE_EMOJIS[stage] || '•';
+  const elapsedSec = (elapsed / 1000).toFixed(1);
+  
+  let message = '';
+  let color = COLORS.YELLOW;
+  
+  switch (stage) {
+    case ProgressStage.STARTED:
+      message = `${emoji} Task started`;
+      color = COLORS.CYAN;
+      break;
+    case ProgressStage.ANALYZING:
+      message = `${emoji} Analyzing...`;
+      break;
+    case ProgressStage.EXECUTING:
+      const tool = details.tool ? ` (${details.tool})` : '';
+      message = `${emoji} Executing${tool}`;
+      break;
+    case ProgressStage.COMPLETED:
+      message = `${emoji} Task completed (${elapsedSec}s)`;
+      color = COLORS.GREEN;
+      break;
+    default:
+      message = `${emoji} ${stage}`;
+  }
+  
+  // Use ASCII mode if env var is set
+  const useAscii = process.env.CODEAGENT_ASCII_MODE;
+  if (useAscii) {
+    message = message.replace(/[⏳🔍⚡✓]/g, match => {
+      const asciiMap = { '⏳': '[*]', '🔍': '[?]', '⚡': '[!]', '✓': '[√]' };
+      return asciiMap[match] || '[·]';
+    });
+  }
+  
+  return `${color}${message}${COLORS.RESET}`;
+}
+
 
 /**
  * Main function
@@ -166,7 +262,7 @@ export async function main(args) {
   }
 
   // Validate configuration
-  validateConfig(config);
+  await validateConfig(config);
 
   // Load agent configuration if specified
   if (config.agent) {
@@ -183,6 +279,21 @@ export async function main(args) {
   const logger = createLogger();
 
   try {
+    // Track start time for progress elapsed calculation
+    const startTime = Date.now();
+
+    // Create progress callback if not in quiet mode
+    const progressCallback = config.quiet ? null : (progressEvent) => {
+      const elapsed = Date.now() - startTime;
+      const formatted = formatProgress(
+        progressEvent.stage,
+        'main',
+        elapsed,
+        progressEvent.details || {}
+      );
+      console.error(formatted);
+    };
+
     // Run task
     const result = await runTask(
       {
@@ -198,7 +309,9 @@ export async function main(args) {
       backend,
       {
         timeout: config.timeout * 1000,
-        logger
+        logger,
+        onProgress: progressCallback,
+        backendOutput: config.backendOutput
       }
     );
 
@@ -227,6 +340,7 @@ function applyEnvConfigOverrides(config, envConfig, args) {
   const merged = { ...config };
   const hasTimeoutFlag = args.includes('--timeout');
   const hasSkipFlag = args.includes('--skip-permissions') || args.includes('--yolo');
+  const hasQuietFlag = args.includes('--quiet') || args.includes('-q');
 
   if (Number.isFinite(envConfig.timeout) && !hasTimeoutFlag) {
     merged.timeout = envConfig.timeout;
@@ -239,6 +353,10 @@ function applyEnvConfigOverrides(config, envConfig, args) {
 
   if (Number.isFinite(envConfig.maxParallelWorkers)) {
     merged.maxParallelWorkers = envConfig.maxParallelWorkers;
+  }
+
+  if (envConfig.quiet && !hasQuietFlag) {
+    merged.quiet = true;
   }
 
   return merged;

@@ -25,6 +25,8 @@ import { expandHome, isValidSessionId } from './utils.mjs';
  * @property {number} maxParallelWorkers - Max parallel workers
  * @property {boolean} parallel - Parallel mode
  * @property {boolean} fullOutput - Full output in parallel mode
+ * @property {boolean} quiet - Disable progress output
+ * @property {boolean} backendOutput - Forward backend stdout/stderr to terminal
  */
 
 /**
@@ -77,7 +79,9 @@ const DEFAULT_CONFIG = {
   yolo: false,
   maxParallelWorkers: DEFAULT_MAX_PARALLEL_WORKERS,
   parallel: false,
-  fullOutput: false
+  fullOutput: false,
+  quiet: false,
+  backendOutput: false
 };
 
 /**
@@ -114,6 +118,10 @@ export function parseCliArgs(args) {
       config.parallel = true;
     } else if (arg === '--full-output') {
       config.fullOutput = true;
+    } else if (arg === '--quiet' || arg === '-q') {
+      config.quiet = true;
+    } else if (arg === '--backend-output') {
+      config.backendOutput = true;
     } else if (arg === '-') {
       config.explicitStdin = true;
     }
@@ -297,49 +305,74 @@ function buildTaskFromBlock(headerLines, content) {
 /**
  * Validate configuration
  * @param {Config} config - Configuration to validate
+ * @param {object} [options] - Validation options
+ * @param {boolean} [options.checkBackend=true] - Check backend availability
+ * @param {boolean} [options.checkPermissions=true] - Check file permissions
  * @throws {Error} If configuration is invalid
  */
-export function validateConfig(config) {
+export async function validateConfig(config, options = {}) {
+  const {
+    checkBackend = true,
+    checkPermissions = true
+  } = options;
+
+  const errors = [];
+  const warnings = [];
+
   // Resume mode requires session ID
   if (config.mode === 'resume') {
     if (!config.sessionId) {
-      const error = new Error('Resume mode requires a session ID');
-      error.exitCode = 2;
-      throw error;
-    }
-    if (!isValidSessionId(config.sessionId)) {
-      const error = new Error('Invalid session ID format');
-      error.exitCode = 2;
-      throw error;
+      errors.push({ message: 'Resume mode requires a session ID', exitCode: 2 });
+    } else if (!isValidSessionId(config.sessionId)) {
+      errors.push({ message: 'Invalid session ID format', exitCode: 2 });
     }
   }
 
   // Normal mode requires a task
   if (config.mode === 'new' && !config.task && !config.explicitStdin && !config.parallel) {
-    const error = new Error('No task provided');
-    error.exitCode = 2;
-    throw error;
+    errors.push({ message: 'No task provided', exitCode: 2 });
   }
 
-  // Workdir cannot be "-"
-  if (config.workDir === '-') {
-    const error = new Error('Working directory cannot be "-"');
-    error.exitCode = 2;
-    throw error;
+  // Workdir cannot be "-" or empty
+  if (!config.workDir || config.workDir === '-') {
+    errors.push({ message: 'Working directory cannot be "-" or empty', exitCode: 2 });
   }
 
   // Validate agent name if provided
   if (config.agent && !/^[a-zA-Z0-9_-]+$/.test(config.agent)) {
-    const error = new Error('Invalid agent name format');
-    error.exitCode = 2;
-    throw error;
+    errors.push({ message: 'Invalid agent name format', exitCode: 2 });
   }
 
   // Validate timeout
   if (config.timeout <= 0) {
-    const error = new Error('Timeout must be positive');
-    error.exitCode = 2;
+    errors.push({ message: 'Timeout must be positive', exitCode: 2 });
+  } else if (config.timeout > 86400) {
+    // Max 24 hours
+    warnings.push('Timeout exceeds 24 hours, consider breaking down the task');
+  }
+
+  // Validate backend value
+  const validBackends = ['', 'codex', 'claude', 'gemini', 'opencode'];
+  if (config.backend && !validBackends.includes(config.backend)) {
+    errors.push({ message: `Invalid backend: ${config.backend}. Valid options: codex, claude, gemini, opencode`, exitCode: 2 });
+  }
+
+  // Validate maxParallelWorkers
+  if (config.maxParallelWorkers < 0) {
+    errors.push({ message: 'maxParallelWorkers cannot be negative', exitCode: 2 });
+  }
+
+  // Throw all errors
+  if (errors.length > 0) {
+    const error = new Error(errors.map(e => e.message).join('; '));
+    error.exitCode = errors[0].exitCode;
+    error.errors = errors;
     throw error;
+  }
+
+  // Log warnings
+  for (const warning of warnings) {
+    console.warn(`Warning: ${warning}`);
   }
 }
 
@@ -365,6 +398,11 @@ export function loadEnvConfig() {
   // Max parallel workers
   if (process.env.CODEAGENT_MAX_PARALLEL_WORKERS) {
     config.maxParallelWorkers = parseInt(process.env.CODEAGENT_MAX_PARALLEL_WORKERS, 10);
+  }
+
+  // Quiet mode
+  if (process.env.CODEAGENT_QUIET) {
+    config.quiet = true;
   }
 
   return config;

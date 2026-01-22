@@ -146,6 +146,7 @@ function detectProgressFromEvent(event, backendType) {
  * @param {Logger} [options.logger] - Logger instance
  * @param {AbortSignal} [options.signal] - Abort signal
  * @param {function(ProgressEvent): void} [options.onProgress] - Progress callback
+ * @param {boolean} [options.backendOutput] - Forward backend output to terminal
  * @returns {Promise<TaskResult>}
  */
 export async function runTask(taskSpec, backend, options = {}) {
@@ -153,7 +154,8 @@ export async function runTask(taskSpec, backend, options = {}) {
     timeout = 7200000,
     logger = nullLogger,
     signal: externalSignal,
-    onProgress = null
+    onProgress = null,
+    backendOutput = false
   } = options;
 
   const taskId = taskSpec.id || 'main';
@@ -196,12 +198,47 @@ export async function runTask(taskSpec, backend, options = {}) {
 
   logger.info(`Executing: ${command} ${args.join(' ')}`);
 
+  // Determine stdio configuration based on backendOutput option
+  let stdioConfig;
+  let outputForwarder = null;
+
+  if (backendOutput) {
+    // When backendOutput is enabled, pipe stdout/stderr and forward in real-time
+    stdioConfig = ['pipe', 'pipe', 'pipe'];
+  } else {
+    // Normal mode: capture output for parsing
+    stdioConfig = ['pipe', 'pipe', 'pipe'];
+  }
+
   // Spawn process
   const child = spawn(command, args, {
     cwd: taskSpec.workDir || process.cwd(),
     env: { ...process.env },
-    stdio: ['pipe', 'pipe', 'pipe']
+    stdio: stdioConfig
   });
+
+  // Set up output forwarding if enabled
+  if (backendOutput) {
+    // Forward stdout in real-time (preserves ANSI colors)
+    child.stdout.on('data', (data) => {
+      process.stdout.write(data);
+    });
+
+    // Forward stderr in real-time (preserves ANSI colors)
+    child.stderr.on('data', (data) => {
+      process.stderr.write(data);
+    });
+
+    // Add separator to distinguish backend output from progress
+    outputForwarder = {
+      start: () => {
+        process.stderr.write('\n--- Backend Output Start ---\n');
+      },
+      end: () => {
+        process.stderr.write('\n--- Backend Output End ---\n');
+      }
+    };
+  }
 
   // Track if we've been interrupted
   let interrupted = false;

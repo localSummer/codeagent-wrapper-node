@@ -137,6 +137,48 @@ Refactor the authentication module:
 EOF
 ```
 
+### Real-time Progress Display
+
+See what's happening during task execution with real-time progress updates:
+
+```bash
+# Normal execution - shows live progress
+codeagent-wrapper "Analyze the authentication module"
+# Output:
+# ⏳ Task started
+# 🔍 Analyzing...
+# ⚡ Executing
+# ✓ Task completed (12.3s)
+
+# Disable progress output for scripts
+codeagent-wrapper --quiet "Build the project"
+
+# Or use environment variable
+export CODEAGENT_QUIET=1
+codeagent-wrapper "Run tests"
+
+# Use ASCII mode for environments without emoji support
+export CODEAGENT_ASCII_MODE=1
+codeagent-wrapper "Deploy to production"
+# Output:
+# [*] Task started
+# [?] Analyzing...
+# [!] Executing
+# [√] Task completed (8.7s)
+```
+
+**Progress Stages**:
+- ⏳ `Task started` - Execution begins
+- 🔍 `Analyzing...` - AI thinking/analyzing phase
+- ⚡ `Executing` - Running tools/commands
+- ✓ `Task completed` - Execution finished with total time
+
+**Note**: Progress output is sent to stderr, while task output goes to stdout, allowing you to redirect them separately:
+```bash
+codeagent-wrapper "Build" 2>/dev/null  # Hide progress, show output only
+codeagent-wrapper "Build" 1>/dev/null  # Hide output, show progress only
+```
+
 ### Parallel Execution
 
 Run multiple tasks concurrently with dependency management:
