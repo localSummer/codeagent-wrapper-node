@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { getWrapperName } from './wrapper-name.mjs';
+import { isProcessRunning } from './process-check.mjs';
 
 const MAX_ERROR_ENTRIES = 100;
 const FLUSH_INTERVAL_MS = 500;
@@ -269,20 +270,6 @@ export function createLogger(suffix = '') {
   
   const logPath = path.join(logDir, filename);
   return new Logger(logPath);
-}
-
-/**
- * Check if a process is running
- * @param {number} pid - Process ID
- * @returns {boolean}
- */
-function isProcessRunning(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return e.code === 'EPERM';
-  }
 }
 
 /**
