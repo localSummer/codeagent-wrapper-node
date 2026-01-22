@@ -52,11 +52,25 @@ export async function runTask(taskSpec, backend, options = {}) {
   const taskId = taskSpec.id || 'main';
   logger.info(`Starting task: ${taskId}`);
 
+  // Load and inject prompt file content if specified
+  let effectiveTask = taskSpec.task;
+  if (taskSpec.promptFile) {
+    try {
+      const promptContent = await loadPromptFile(taskSpec.promptFile);
+      if (promptContent) {
+        effectiveTask = `${promptContent}\n\n=== TASK ===\n${taskSpec.task}`;
+        logger.info(`Loaded prompt file: ${taskSpec.promptFile}`);
+      }
+    } catch (error) {
+      logger.warn(`Failed to load prompt file: ${error.message}`);
+    }
+  }
+
   // Determine if we should use stdin
-  const useStdin = shouldUseStdin(taskSpec.task, false, taskSpec.useStdin);
+  const useStdin = shouldUseStdin(effectiveTask, false, taskSpec.useStdin);
 
   // Build arguments
-  const targetArg = useStdin ? '-' : taskSpec.task;
+  const targetArg = useStdin ? '-' : effectiveTask;
   const args = backend.buildArgs(taskSpec, targetArg);
   const command = backend.command();
 
@@ -102,7 +116,7 @@ export async function runTask(taskSpec, backend, options = {}) {
 
   // Write task to stdin if needed
   if (useStdin) {
-    child.stdin.write(taskSpec.task);
+    child.stdin.write(effectiveTask);
     child.stdin.end();
   } else {
     child.stdin.end();
