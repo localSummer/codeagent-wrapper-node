@@ -194,6 +194,58 @@ session_id: abc123        # Optional: resume from existing session
 | `skip_permissions` | No | false | Skip permission checks (true/false) |
 | `session_id` | No | - | Resume from existing session |
 
+### Progress Display
+
+By default, `codeagent-wrapper` displays real-time progress as tasks execute, showing different stages:
+
+```bash
+# Normal execution shows progress to stderr
+codeagent-wrapper "Analyze the codebase"
+# Output (in stderr):
+# ⏳ Task main started
+# 🔍 Analyzing...
+# ⚡ Executing tool: read_file
+# ⚡ Executing tool: grep_search
+# ✓ Task completed (15.2s)
+```
+
+**Progress Stages**:
+- ⏳ **Started**: Task begins
+- 🔍 **Analyzing**: AI is thinking/reasoning
+- ⚡ **Executing**: Running tools (shows tool name)
+- ✓ **Completed**: Task finished (shows elapsed time)
+
+**Suppress Progress**:
+
+```bash
+# Use --quiet flag
+codeagent-wrapper --quiet "Analyze code"
+
+# Or set environment variable
+CODEAGENT_QUIET=1 codeagent-wrapper "Analyze code"
+
+# Filter stderr in scripts
+codeagent-wrapper "Analyze code" 2>/dev/null
+```
+
+**ASCII Mode** (for terminals without emoji support):
+
+```bash
+CODEAGENT_ASCII_MODE=1 codeagent-wrapper "Analyze code"
+# Output:
+# [START] Task main started
+# [THINK] Analyzing...
+# [EXEC] Executing tool: read_file
+# [DONE] Task completed (15.2s)
+```
+
+**Note**: Progress messages go to `stderr`, while final results go to `stdout`. This allows piping results without progress noise:
+
+```bash
+# Progress visible in terminal, but not captured in pipe
+codeagent-wrapper "Get stats" | jq .
+```
+
 ### Other Commands
 
 ```bash
@@ -224,6 +276,7 @@ codeagent-wrapper init --force  # Overwrite without confirmation
 | `--yolo` | Alias for `--skip-permissions` |
 | `--parallel` | Run tasks in parallel mode |
 | `--full-output` | Show full output in parallel mode |
+| `--quiet` | Suppress progress output (no real-time progress messages) |
 | `--timeout <seconds>` | Timeout in seconds (default: 7200 = 2 hours) |
 | `--cleanup` | Clean up old log files |
 | `--force` | Force overwrite without confirmation (for `init`) |
@@ -237,6 +290,7 @@ codeagent-wrapper init --force  # Overwrite without confirmation
 | `CODEX_TIMEOUT` | Timeout value. **If >10000, treated as milliseconds; otherwise seconds** | 7200 (seconds) |
 | `CODEAGENT_SKIP_PERMISSIONS` | Skip permissions if set to **any non-empty value** | (unset) |
 | `CODEAGENT_MAX_PARALLEL_WORKERS` | Max parallel workers. 0 = unlimited | min(100, cpuCount*4) |
+| `CODEAGENT_QUIET` | Suppress progress output if set to `1` | (unset) |
 | `CODEAGENT_ASCII_MODE` | Use ASCII symbols instead of Unicode if set | (unset) |
 | `CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS` | Logger close timeout in milliseconds | 5000 |
 
@@ -315,6 +369,30 @@ tail -f ~/.codeagent/logs/codeagent-*.log
 codeagent-wrapper --cleanup
 ```
 
+### Backend Output Debugging
+
+To see raw backend stderr output for debugging purposes:
+
+```bash
+# Show backend stderr output (prefixed with [BACKEND])
+codeagent-wrapper --backend-output "your task"
+
+# Enable debug mode (auto-enables backend output)
+codeagent-wrapper --debug "your task"
+
+# Using environment variables
+export CODEAGENT_BACKEND_OUTPUT=1
+export CODEAGENT_DEBUG=1
+codeagent-wrapper "your task"
+```
+
+**Notes**:
+- `--backend-output` forwards the backend process stderr to your terminal
+- `--debug` mode automatically enables `--backend-output`
+- Output is prefixed with `[BACKEND]` for distinction
+- ANSI color codes are preserved if terminal supports TTY
+- Useful for troubleshooting backend issues
+
 ### Troubleshooting
 
 | Issue | Solution |
@@ -334,6 +412,36 @@ codeagent-wrapper --cleanup
 | 124 | Timeout |
 | 127 | Command not found (backend not installed) |
 | 130 | Interrupted (SIGINT/SIGTERM) |
+
+## Performance
+
+codeagent-wrapper is optimized for fast execution:
+
+- **JSON Parsing**: >60,000 events/sec throughput
+- **Smart Buffering**: Reduced memory footprint with priority flushing
+- **Startup Tracking**: Detailed timing metrics available
+
+**Enable Performance Metrics**:
+
+```bash
+# Output structured performance data
+CODEAGENT_PERFORMANCE_METRICS=1 codeagent-wrapper "task" 2>&1 | grep metric
+
+# Example output:
+# {"metric":"task_execution","startup_ms":45.23,"total_ms":2345.67,"backend":"claude"}
+```
+
+**Tuning Options**:
+
+```bash
+# Adjust logger flush interval (default: 200ms)
+export CODEAGENT_LOGGER_FLUSH_INTERVAL_MS=100
+
+# Adjust logger queue size (default: 100 entries)
+export CODEAGENT_LOGGER_QUEUE_SIZE=50
+```
+
+See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed performance guide and benchmarking.
 
 ## Architecture
 

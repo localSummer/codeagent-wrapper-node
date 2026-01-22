@@ -366,3 +366,73 @@ export function extractAllMetrics(lines) {
     keyOutput
   };
 }
+
+// =============================================================================
+// Progress Display Functions
+// =============================================================================
+
+/**
+ * Progress stage emoji mapping
+ */
+const STAGE_EMOJI = {
+  'started': '⏳',
+  'analyzing': '🔍',
+  'executing': '⚡',
+  'completed': '✓'
+};
+
+/**
+ * Progress stage ASCII mapping (fallback for terminals without emoji support)
+ */
+const STAGE_ASCII = {
+  'started': '[START]',
+  'analyzing': '[THINK]',
+  'executing': '[EXEC]',
+  'completed': '[DONE]'
+};
+
+/**
+ * Format elapsed time in human-readable format
+ * @param {number} seconds - Elapsed time in seconds
+ * @returns {string} Formatted time
+ */
+function formatElapsedTime(seconds) {
+  if (seconds < 1) {
+    return `${Math.round(seconds * 1000)}ms`;
+  }
+  return `${seconds.toFixed(1)}s`;
+}
+
+/**
+ * Format progress message for display
+ * @param {Object} progressEvent - Progress event object
+ * @param {string} progressEvent.stage - Progress stage
+ * @param {string} progressEvent.message - Progress message
+ * @param {Object} [progressEvent.details] - Additional details
+ * @param {number} [startTime] - Task start time in milliseconds (for elapsed calculation)
+ * @returns {string} Formatted progress message
+ */
+export function formatProgressMessage(progressEvent, startTime = null) {
+  if (!progressEvent || !progressEvent.stage) {
+    return '';
+  }
+
+  const useAscii = process.env.CODEAGENT_ASCII_MODE === '1';
+  const symbols = useAscii ? STAGE_ASCII : STAGE_EMOJI;
+  
+  const symbol = symbols[progressEvent.stage] || '•';
+  let message = `${symbol} ${progressEvent.message || ''}`;
+  
+  // Add tool name if available
+  if (progressEvent.details && progressEvent.details.toolName) {
+    message += `: ${progressEvent.details.toolName}`;
+  }
+  
+  // Add elapsed time for completed stage
+  if (progressEvent.stage === 'completed' && startTime) {
+    const elapsed = (Date.now() - startTime) / 1000;
+    message += ` (${formatElapsedTime(elapsed)})`;
+  }
+  
+  return message;
+}

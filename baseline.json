@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-01-22T13:57:32.456Z",
+  "node_version": "v22.14.0",
+  "platform": "darwin",
+  "metrics": {
+    "json_parse_throughput": 200,
+    "log_write_latency": 250,
+    "json_parse_overhead": 0.05
+  }
+}

@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { parseCliArgs, parseParallelConfig, parseParallelConfigStream, validateConfig, loadEnvConfig } from '../src/config.mjs';
+import { parseCliArgs, parseParallelConfig, parseParallelConfigStream, validateConfigSync, loadEnvConfig } from '../src/config.mjs';
 import { Readable } from 'node:stream';
 
 describe('parseCliArgs', () => {
@@ -116,19 +116,82 @@ Run tests
 describe('validateConfig', () => {
   it('should throw for resume without session ID', () => {
     assert.throws(() => {
-      validateConfig({ mode: 'resume', sessionId: '' });
-    }, /session ID/i);
+      validateConfigSync({ mode: 'resume', sessionId: '', timeout: 3600 });
+    }, /sessionId/i);
   });
 
   it('should throw for invalid agent name', () => {
     assert.throws(() => {
-      validateConfig({ mode: 'new', task: 'test', agent: 'invalid@name' });
-    }, /agent name/i);
+      validateConfigSync({ mode: 'new', task: 'test', agent: 'invalid@name', timeout: 3600 });
+    }, /agent/i);
   });
 
   it('should accept valid config', () => {
     assert.doesNotThrow(() => {
-      validateConfig({ mode: 'new', task: 'test' });
+      validateConfigSync({ mode: 'new', task: 'test', timeout: 3600, agent: '', workDir: '', sessionId: '' });
     });
+  });
+});
+
+describe('parseCliArgs - quiet flag', () => {
+  it('should parse --quiet flag', () => {
+    const config = parseCliArgs(['--quiet', 'my task']);
+    assert.strictEqual(config.quiet, true);
+  });
+
+  it('should default quiet to false', () => {
+    const config = parseCliArgs(['my task']);
+    assert.strictEqual(config.quiet, false);
+  });
+
+  it('should handle --quiet with other flags', () => {
+    const config = parseCliArgs(['--backend', 'claude', '--quiet', 'my task']);
+    assert.strictEqual(config.quiet, true);
+    assert.strictEqual(config.backend, 'claude');
+  });
+});
+
+describe('loadEnvConfig - quiet mode', () => {
+  it('should parse CODEAGENT_QUIET=1', () => {
+    const originalValue = process.env.CODEAGENT_QUIET;
+    process.env.CODEAGENT_QUIET = '1';
+
+    const config = loadEnvConfig();
+    assert.strictEqual(config.quiet, true);
+
+    // Restore
+    if (originalValue === undefined) {
+      delete process.env.CODEAGENT_QUIET;
+    } else {
+      process.env.CODEAGENT_QUIET = originalValue;
+    }
+  });
+
+  it('should not set quiet when CODEAGENT_QUIET is not set', () => {
+    const originalValue = process.env.CODEAGENT_QUIET;
+    delete process.env.CODEAGENT_QUIET;
+
+    const config = loadEnvConfig();
+    assert.strictEqual(config.quiet, undefined);
+
+    // Restore
+    if (originalValue !== undefined) {
+      process.env.CODEAGENT_QUIET = originalValue;
+    }
+  });
+
+  it('should not set quiet when CODEAGENT_QUIET is not "1"', () => {
+    const originalValue = process.env.CODEAGENT_QUIET;
+    process.env.CODEAGENT_QUIET = '0';
+
+    const config = loadEnvConfig();
+    assert.strictEqual(config.quiet, undefined);
+
+    // Restore
+    if (originalValue === undefined) {
+      delete process.env.CODEAGENT_QUIET;
+    } else {
+      process.env.CODEAGENT_QUIET = originalValue;
+    }
   });
 });

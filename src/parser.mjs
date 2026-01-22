@@ -7,6 +7,9 @@ import * as readline from 'readline';
 // T2.2: Maximum message size to prevent memory exhaustion (10MB)
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
 
+// Performance: Pre-check set for fast JSON detection
+const JSON_FIRST_CHARS = new Set(['{', '[']);
+
 /**
  * @typedef {Object} UnifiedEvent
  * @property {string} type - Event type
@@ -215,17 +218,29 @@ export async function parseJSONStream(stream, options = {}) {
   let messagesSize = 0; // T2.2: Track total message size
   let sessionId = '';
   let detectedBackend = 'unknown';
+  let cachedBackend = null; // Performance: Cache backend type after first detection
 
   for await (const line of rl) {
     const trimmed = line.trim();
+    
+    // Performance: Fast empty line skip
     if (!trimmed) continue;
+
+    // Performance: Pre-check first character before attempting JSON.parse
+    const firstChar = trimmed[0];
+    if (!JSON_FIRST_CHARS.has(firstChar)) {
+      continue; // Skip non-JSON lines quickly
+    }
 
     try {
       const event = JSON.parse(trimmed);
 
-      // Detect backend on first valid event
-      if (detectedBackend === 'unknown') {
+      // Performance: Use cached backend type if available
+      if (cachedBackend) {
+        detectedBackend = cachedBackend;
+      } else if (detectedBackend === 'unknown') {
         detectedBackend = detectBackend(event);
+        cachedBackend = detectedBackend; // Cache for subsequent events
       }
 
       // Notify event callback

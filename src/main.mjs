@@ -6,7 +6,7 @@ import { parseCliArgs, parseParallelConfigStream, validateConfig, loadEnvConfig 
 import { selectBackend } from './backend.mjs';
 import { runTask, runParallel } from './executor.mjs';
 import { createLogger, cleanupOldLogs } from './logger.mjs';
-import { generateFinalOutput } from './utils.mjs';
+import { generateFinalOutput, formatProgressMessage } from './utils.mjs';
 import { getAgentConfig, loadModelsConfig } from './agent-config.mjs';
 import { runInit } from './init.mjs';
 import * as readline from 'readline';
@@ -16,49 +16,145 @@ const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 const VERSION = pkg.version;
 
-const HELP_TEXT = `
+const HELP_HEADER = `
 codeagent-wrapper v${VERSION}
 Unified wrapper for AI CLI backends (Codex, Claude, Gemini, Opencode)
+`;
 
+const HELP_USAGE = `
 Usage:
   codeagent-wrapper [options] <task> [workdir]
   codeagent-wrapper resume <session_id> <task> [workdir]
   codeagent-wrapper --parallel < tasks.txt
-  codeagent-wrapper --cleanup
   codeagent-wrapper init [--force]
-
-Options:
-  --backend <name>      Backend to use (codex, claude, gemini, opencode)
-  --model <model>       Model to use
-  --agent <name>        Agent configuration name
-  --prompt-file <path>  Path to prompt file
-  --skip-permissions    Skip permission checks (YOLO mode)
-  --parallel            Run tasks in parallel mode
-  --full-output         Show full output in parallel mode
-  --timeout <seconds>   Timeout in seconds (default: 7200)
-  --cleanup             Clean up old log files
-  --force               Force overwrite without confirmation (for init)
-  --help, -h            Show this help
-  --version, -v         Show version
-
-Commands:
-  init                  Install codeagent skill to ~/.claude/skills/
-
-Environment Variables:
-  CODEX_TIMEOUT                    Timeout in milliseconds or seconds
-  CODEAGENT_SKIP_PERMISSIONS       Skip permissions if set
-  CODEAGENT_MAX_PARALLEL_WORKERS   Max parallel workers (0 = unlimited, default: min(100, cpuCount*4))
-  CODEAGENT_ASCII_MODE             Use ASCII symbols instead of Unicode
-
-Examples:
-  codeagent-wrapper "Fix the bug in auth.js"
-  codeagent-wrapper --backend claude "Add tests" ./src
-  codeagent-wrapper --agent oracle "Review this code"
-  codeagent-wrapper resume abc123 "Continue from where we left off"
-  echo "Build the project" | codeagent-wrapper -
-  codeagent-wrapper init
-  codeagent-wrapper init --force
+  codeagent-wrapper --cleanup
 `;
+
+const HELP_COMMANDS = `
+Commands:
+  init [--force]        Install codeagent skill to ~/.claude/skills/
+                        Use --force to overwrite existing installation
+                        Example: codeagent-wrapper init
+
+  resume <session_id>   Resume a previous session and continue with a new task
+                        The session ID can be found in previous task output
+                        Example: codeagent-wrapper resume abc123 "Continue work"
+
+  --parallel            Run multiple tasks in parallel, reading from stdin
+                        Each line should be a JSON task definition
+                        Example: cat tasks.txt | codeagent-wrapper --parallel
+
+  --cleanup             Remove old log files to free up disk space
+                        Logs older than 30 days are deleted
+                        Example: codeagent-wrapper --cleanup
+`;
+
+const HELP_OPTIONS = `
+Options:
+  Backend Configuration:
+    --backend <name>    Backend to use (codex, claude, gemini, opencode)
+    --model <model>     Model to use
+    --agent <name>      Agent configuration name
+
+  Input:
+    --prompt-file <path>  Path to prompt file
+
+  Execution Control:
+    --timeout <seconds>       Timeout in seconds (default: 7200)
+    --skip-permissions        Skip permission checks (YOLO mode)
+    --max-parallel-workers <n>  Max parallel workers (default: min(100, CPU*4))
+
+  Output Control:
+    --quiet             Suppress progress output
+    --full-output       Show full output in parallel mode
+    --backend-output    Show backend stderr output (for debugging)
+    --debug             Enable debug mode (auto-enables --backend-output)
+
+  Meta:
+    --help, -h          Show this help
+    --version, -v       Show version
+    --force             Force overwrite without confirmation (for init)
+`;
+
+const HELP_ENV = `
+Environment Variables:
+  CODEX_TIMEOUT                   Timeout (seconds or milliseconds)
+                                  Example: export CODEX_TIMEOUT=3600
+
+  CODEAGENT_SKIP_PERMISSIONS      Skip permission checks (YOLO mode)
+                                  Example: export CODEAGENT_SKIP_PERMISSIONS=1
+
+  CODEAGENT_MAX_PARALLEL_WORKERS  Max parallel workers
+                                  Default: min(100, CPU_count * 4)
+                                  Example: export CODEAGENT_MAX_PARALLEL_WORKERS=20
+
+  CODEAGENT_QUIET                 Suppress progress output
+                                  Values: Set to 1 to enable
+                                  Example: export CODEAGENT_QUIET=1
+
+  CODEAGENT_ASCII_MODE            Use ASCII symbols instead of Unicode
+                                  Values: Set to 1 to enable
+                                  Example: export CODEAGENT_ASCII_MODE=1
+
+  CODEAGENT_BACKEND_OUTPUT        Show backend stderr output
+                                  Values: Set to 1 to enable
+                                  Example: export CODEAGENT_BACKEND_OUTPUT=1
+
+  CODEAGENT_DEBUG                 Enable debug mode (auto-enables backend output)
+                                  Values: Set to 1 to enable
+                                  Example: export CODEAGENT_DEBUG=1
+`;
+
+const HELP_EXAMPLES = `
+Examples:
+  # Basic usage - run a simple task
+  codeagent-wrapper "Fix the bug in auth.js"
+
+  # Specify backend and working directory
+  codeagent-wrapper --backend claude "Add tests" ./src
+
+  # Use predefined agent configuration
+  codeagent-wrapper --agent oracle "Review this code"
+
+  # Resume previous session
+  codeagent-wrapper resume abc123 "Continue from where we left off"
+
+  # Read task from stdin
+  echo "Build the project" | codeagent-wrapper -
+
+  # Parallel execution from file
+  cat tasks.txt | codeagent-wrapper --parallel
+
+  # Debug mode with backend output
+  codeagent-wrapper --debug --backend-output "Debug this issue"
+
+  # Install codeagent skill to Claude
+  codeagent-wrapper init
+`;
+
+const HELP_QUICKSTART = `
+Quick Start:
+  1. Install a backend:
+     npm install -g @anthropic-ai/claude-code
+
+  2. Run your first task:
+     codeagent-wrapper "Your task description here"
+
+  3. For more options:
+     codeagent-wrapper --help
+
+Documentation: https://github.com/codeagent-wrapper-node#readme
+`;
+
+const HELP_TEXT = [
+  HELP_HEADER,
+  HELP_USAGE,
+  HELP_COMMANDS,
+  HELP_OPTIONS,
+  HELP_ENV,
+  HELP_EXAMPLES,
+  HELP_QUICKSTART
+].join('\n');
 
 /**
  * Read task from stdin
@@ -124,6 +220,13 @@ export async function main(args) {
   let config = parseCliArgs(args);
   config = applyEnvConfigOverrides(config, envConfig, args);
 
+  // Validate configuration
+  try {
+    await validateConfig(config);
+  } catch (error) {
+    throw error; // Re-throw to be caught by bin/codeagent-wrapper.mjs
+  }
+
   // Handle parallel mode
   if (config.parallel) {
     const parallelConfig = await readParallelInput();
@@ -134,7 +237,8 @@ export async function main(args) {
         maxWorkers: config.maxParallelWorkers,
         timeout: config.timeout * 1000,
         fullOutput: config.fullOutput,
-        logger
+        logger,
+        backendOutput: config.backendOutput
       });
 
       // Output results
@@ -182,6 +286,21 @@ export async function main(args) {
   // Create logger
   const logger = createLogger();
 
+  // Track task start time for elapsed calculation
+  const taskStartTime = Date.now();
+
+  // Create progress callback (only if not in quiet mode)
+  const onProgress = config.quiet ? null : (progressEvent) => {
+    try {
+      const message = formatProgressMessage(progressEvent, taskStartTime);
+      if (message) {
+        process.stderr.write(message + '\n');
+      }
+    } catch (error) {
+      logger.error(`Progress callback error: ${error.message}`);
+    }
+  };
+
   try {
     // Run task
     const result = await runTask(
@@ -198,7 +317,9 @@ export async function main(args) {
       backend,
       {
         timeout: config.timeout * 1000,
-        logger
+        logger,
+        onProgress,
+        backendOutput: config.backendOutput
       }
     );
 

@@ -9,8 +9,9 @@ import { getWrapperName } from './wrapper-name.mjs';
 import { isProcessRunning } from './process-check.mjs';
 
 const MAX_ERROR_ENTRIES = 100;
-const FLUSH_INTERVAL_MS = 500;
-const QUEUE_SIZE = 1000;
+// Performance: Optimized buffer parameters (reduced from 500ms/1000)
+const FLUSH_INTERVAL_MS = parseInt(process.env.CODEAGENT_LOGGER_FLUSH_INTERVAL_MS || '200', 10);
+const QUEUE_SIZE = parseInt(process.env.CODEAGENT_LOGGER_QUEUE_SIZE || '100', 10);
 const CLOSE_TIMEOUT_MS = parseInt(process.env.CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS || '5000', 10);
 
 // T4.1: Lazy initialization - cache log directory path and initialization promise
@@ -147,6 +148,10 @@ export class Logger {
       if (this.#errorEntries.length > MAX_ERROR_ENTRIES * 2) {
         this.#errorEntries = this.#errorEntries.slice(-MAX_ERROR_ENTRIES);
       }
+      
+      // Performance: Smart flush - write error/warn immediately
+      this.#flush();
+      return;
     }
 
     // Flush if queue is full

@@ -5,7 +5,23 @@
 import * as path from 'path';
 import * as os from 'os';
 import * as readline from 'readline';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { access, stat } from 'fs/promises';
+import { constants } from 'fs';
 import { expandHome, isValidSessionId } from './utils.mjs';
+import {
+  InvalidParameterError,
+  MissingParameterError,
+  InvalidFilePathError,
+  FileNotFoundError,
+  PermissionDeniedError,
+  BackendNotFoundError,
+  SessionValidationError,
+  TaskValidationError
+} from './errors.mjs';
+
+const execAsync = promisify(exec);
 
 /**
  * @typedef {Object} Config
@@ -25,6 +41,9 @@ import { expandHome, isValidSessionId } from './utils.mjs';
  * @property {number} maxParallelWorkers - Max parallel workers
  * @property {boolean} parallel - Parallel mode
  * @property {boolean} fullOutput - Full output in parallel mode
+ * @property {boolean} quiet - Suppress progress output
+ * @property {boolean} backendOutput - Forward backend stderr output
+ * @property {boolean} debug - Enable debug mode
  */
 
 /**
@@ -77,7 +96,10 @@ const DEFAULT_CONFIG = {
   yolo: false,
   maxParallelWorkers: DEFAULT_MAX_PARALLEL_WORKERS,
   parallel: false,
-  fullOutput: false
+  fullOutput: false,
+  quiet: false,
+  backendOutput: false,
+  debug: false
 };
 
 /**
@@ -114,6 +136,12 @@ export function parseCliArgs(args) {
       config.parallel = true;
     } else if (arg === '--full-output') {
       config.fullOutput = true;
+    } else if (arg === '--quiet') {
+      config.quiet = true;
+    } else if (arg === '--backend-output') {
+      config.backendOutput = true;
+    } else if (arg === '--debug') {
+      config.debug = true;
     } else if (arg === '-') {
       config.explicitStdin = true;
     }
@@ -144,6 +172,11 @@ export function parseCliArgs(args) {
         config.workDir = path.resolve(positional[1]);
       }
     }
+  }
+
+  // Auto-enable backendOutput in debug mode
+  if (config.debug) {
+    config.backendOutput = true;
   }
 
   return config;
@@ -295,53 +328,238 @@ function buildTaskFromBlock(headerLines, content) {
 }
 
 /**
- * Validate configuration
- * @param {Config} config - Configuration to validate
- * @throws {Error} If configuration is invalid
+ * Validate file path
+ * @param {string} filePath - Path to validate
+ * @param {Object} options - Validation options
+ * @param {boolean} [options.mustExist] - File must exist
+ * @param {boolean} [options.mustBeDirectory] - Path must be a directory
+ * @param {boolean} [options.mustBeReadable] - File must be readable
+ * @returns {Promise<void>}
  */
-export function validateConfig(config) {
+async function validateFilePath(filePath, options = {}) {
+  const expandedPath = expandHome(filePath);
+  
+  // Check existence
+  if (options.mustExist) {
+    try {
+      await access(expandedPath, constants.F_OK);
+    } catch {
+      throw new FileNotFoundError(expandedPath);
+    }
+  }
+  
+  // Check if directory
+  if (options.mustBeDirectory) {
+    try {
+      const stats = await stat(expandedPath);
+      if (!stats.isDirectory()) {
+        throw new InvalidFilePathError(expandedPath, 'directory', 'file');
+      }
+    } catch (err) {
+      if (err instanceof InvalidFilePathError) throw err;
+      throw new FileNotFoundError(expandedPath);
+    }
+  }
+  
+  // Check readability
+  if (options.mustBeReadable) {
+    try {
+      await access(expandedPath, constants.R_OK);
+    } catch {
+      throw new PermissionDeniedError(expandedPath, 'read');
+    }
+  }
+}
+
+/**
+ * Validate backend availability
+ * @param {string} backend - Backend name
+ * @returns {Promise<void>}
+ */
+async function validateBackendAvailability(backend) {
+  // Dynamically import to avoid circular dependency
+  const { selectBackend } = await import('./backend.mjs');
+  const backendInstance = selectBackend(backend);
+  const command = backendInstance.command();
+  
+  const whichCommand = process.platform === 'win32'
+    ? `where ${command}`
+    : `which ${command}`;
+  
+  try {
+    await execAsync(whichCommand);
+  } catch {
+    throw new BackendNotFoundError(backend);
+  }
+}
+
+/**
+ * Validate parallel configuration
+ * @param {TaskSpec[]} tasks - Tasks to validate
+ */
+function validateParallelConfig(tasks) {
+  if (!tasks || tasks.length === 0) {
+    throw new TaskValidationError('No tasks provided for parallel execution');
+  }
+
+  // Check task ID uniqueness
+  const ids = new Set();
+  for (const task of tasks) {
+    if (ids.has(task.id)) {
+      throw new TaskValidationError(`Duplicate task ID: ${task.id}`, { duplicateId: task.id });
+    }
+    ids.add(task.id);
+  }
+
+  // Check dependency references
+  for (const task of tasks) {
+    if (task.dependencies) {
+      for (const dep of task.dependencies) {
+        if (!ids.has(dep)) {
+          throw new TaskValidationError(
+            `Dependency not found: ${dep} (required by ${task.id})`,
+            { taskId: task.id, missingDependency: dep }
+          );
+        }
+      }
+    }
+  }
+
+  // Check for circular dependencies
+  const visited = new Set();
+  const recStack = new Set();
+
+  function hasCycle(taskId, taskMap) {
+    if (recStack.has(taskId)) {
+      throw new TaskValidationError(
+        `Circular dependency detected involving task: ${taskId}`,
+        { taskId }
+      );
+    }
+    if (visited.has(taskId)) {
+      return false;
+    }
+
+    visited.add(taskId);
+    recStack.add(taskId);
+
+    const task = taskMap.get(taskId);
+    if (task && task.dependencies) {
+      for (const dep of task.dependencies) {
+        hasCycle(dep, taskMap);
+      }
+    }
+
+    recStack.delete(taskId);
+    return false;
+  }
+
+  const taskMap = new Map(tasks.map(t => [t.id, t]));
+  for (const task of tasks) {
+    hasCycle(task.id, taskMap);
+  }
+}
+
+/**
+ * Validate configuration (async)
+ * @param {Config} config - Configuration to validate
+ * @returns {Promise<void>}
+ * @throws {ValidationError} If configuration is invalid
+ */
+export async function validateConfig(config) {
+  // 1. Validate timeout
+  if (config.timeout <= 0 || config.timeout > 86400) {
+    throw new InvalidParameterError(
+      'timeout',
+      config.timeout,
+      'must be between 1 and 86400 seconds (1s to 24h)'
+    );
+  }
+
+  // 2. Validate maxParallelWorkers
+  if (config.maxParallelWorkers < 0 || config.maxParallelWorkers > 1000) {
+    throw new InvalidParameterError(
+      'maxParallelWorkers',
+      config.maxParallelWorkers,
+      'must be between 0 and 1000'
+    );
+  }
+
+  // 3. Validate task (if not parallel mode and not explicit stdin)
+  if (config.mode === 'new' && !config.task && !config.explicitStdin && !config.parallel) {
+    throw new MissingParameterError('task', 'Task cannot be empty');
+  }
+
+  // 4. Resume mode validation
+  if (config.mode === 'resume') {
+    if (!config.sessionId) {
+      throw new MissingParameterError('sessionId', 'Session ID required in resume mode');
+    }
+    if (!isValidSessionId(config.sessionId)) {
+      throw new SessionValidationError(config.sessionId, 'Invalid format (use alphanumeric and hyphens only)');
+    }
+  }
+
+  // 5. Validate promptFile (if provided)
+  if (config.promptFile) {
+    await validateFilePath(config.promptFile, { mustExist: true, mustBeReadable: true });
+  }
+
+  // 6. Validate workDir (if provided and not "-")
+  if (config.workDir && config.workDir !== '-') {
+    await validateFilePath(config.workDir, { mustExist: true, mustBeDirectory: true });
+  }
+
+  // 7. Validate agent name format (if provided)
+  if (config.agent && !/^[a-zA-Z0-9_-]+$/.test(config.agent)) {
+    throw new InvalidParameterError('agent', config.agent, 'must contain only alphanumeric characters, hyphens, and underscores');
+  }
+
+  // 8. Validate backend availability (skip in parallel mode as tasks may have different backends)
+  if (config.backend && !config.parallel) {
+    await validateBackendAvailability(config.backend);
+  }
+}
+
+/**
+ * Old synchronous validateConfig for backwards compatibility
+ * This is kept for existing code that calls validateConfig synchronously
+ * @deprecated Use async validateConfig instead
+ */
+export function validateConfigSync(config) {
   // Resume mode requires session ID
   if (config.mode === 'resume') {
     if (!config.sessionId) {
-      const error = new Error('Resume mode requires a session ID');
-      error.exitCode = 2;
-      throw error;
+      throw new MissingParameterError('sessionId', 'Session ID required in resume mode');
     }
     if (!isValidSessionId(config.sessionId)) {
-      const error = new Error('Invalid session ID format');
-      error.exitCode = 2;
-      throw error;
+      throw new SessionValidationError(config.sessionId, 'Invalid format');
     }
   }
 
   // Normal mode requires a task
   if (config.mode === 'new' && !config.task && !config.explicitStdin && !config.parallel) {
-    const error = new Error('No task provided');
-    error.exitCode = 2;
-    throw error;
+    throw new MissingParameterError('task', 'Task cannot be empty');
   }
 
   // Workdir cannot be "-"
   if (config.workDir === '-') {
-    const error = new Error('Working directory cannot be "-"');
-    error.exitCode = 2;
-    throw error;
+    throw new InvalidParameterError('workDir', '-', 'cannot be "-"');
   }
 
   // Validate agent name if provided
   if (config.agent && !/^[a-zA-Z0-9_-]+$/.test(config.agent)) {
-    const error = new Error('Invalid agent name format');
-    error.exitCode = 2;
-    throw error;
+    throw new InvalidParameterError('agent', config.agent, 'must contain only alphanumeric characters, hyphens, and underscores');
   }
 
   // Validate timeout
   if (config.timeout <= 0) {
-    const error = new Error('Timeout must be positive');
-    error.exitCode = 2;
-    throw error;
+    throw new InvalidParameterError('timeout', config.timeout, 'must be positive');
   }
 }
+
+// Export validateParallelConfig for use in executor
+export { validateParallelConfig };
 
 /**
  * Load configuration from environment variables
@@ -365,6 +583,21 @@ export function loadEnvConfig() {
   // Max parallel workers
   if (process.env.CODEAGENT_MAX_PARALLEL_WORKERS) {
     config.maxParallelWorkers = parseInt(process.env.CODEAGENT_MAX_PARALLEL_WORKERS, 10);
+  }
+
+  // Quiet mode
+  if (process.env.CODEAGENT_QUIET === '1') {
+    config.quiet = true;
+  }
+
+  // Backend output forwarding
+  if (process.env.CODEAGENT_BACKEND_OUTPUT === '1') {
+    config.backendOutput = true;
+  }
+
+  // Debug mode
+  if (process.env.CODEAGENT_DEBUG === '1') {
+    config.debug = true;
   }
 
   return config;

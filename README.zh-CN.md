@@ -194,6 +194,58 @@ session_id: abc123        # 可选：从现有会话恢复
 | `skip_permissions` | 否 | false | 跳过权限检查（true/false）|
 | `session_id` | 否 | - | 从现有会话恢复 |
 
+### 进度显示
+
+默认情况下，`codeagent-wrapper` 会实时显示任务执行进度，展示不同的阶段：
+
+```bash
+# 正常执行会在 stderr 显示进度
+codeagent-wrapper "分析代码库"
+# 输出（在 stderr）：
+# ⏳ Task main started
+# 🔍 Analyzing...
+# ⚡ Executing tool: read_file
+# ⚡ Executing tool: grep_search
+# ✓ Task completed (15.2s)
+```
+
+**进度阶段**：
+- ⏳ **开始**：任务开始
+- 🔍 **分析**：AI 正在思考/推理
+- ⚡ **执行**：运行工具（显示工具名称）
+- ✓ **完成**：任务完成（显示耗时）
+
+**隐藏进度**：
+
+```bash
+# 使用 --quiet 参数
+codeagent-wrapper --quiet "分析代码"
+
+# 或设置环境变量
+CODEAGENT_QUIET=1 codeagent-wrapper "分析代码"
+
+# 在脚本中过滤 stderr
+codeagent-wrapper "分析代码" 2>/dev/null
+```
+
+**ASCII 模式**（适用于不支持 emoji 的终端）：
+
+```bash
+CODEAGENT_ASCII_MODE=1 codeagent-wrapper "分析代码"
+# 输出：
+# [START] Task main started
+# [THINK] Analyzing...
+# [EXEC] Executing tool: read_file
+# [DONE] Task completed (15.2s)
+```
+
+**注意**：进度消息输出到 `stderr`，而最终结果输出到 `stdout`。这允许管道传输结果而不包含进度信息：
+
+```bash
+# 进度在终端可见，但不会被管道捕获
+codeagent-wrapper "获取统计信息" | jq .
+```
+
 ### 其他命令
 
 ```bash
@@ -224,6 +276,7 @@ codeagent-wrapper init --force  # 无需确认直接覆盖
 | `--yolo` | `--skip-permissions` 的别名 |
 | `--parallel` | 并行任务模式 |
 | `--full-output` | 并行模式下显示完整输出 |
+| `--quiet` | 隐藏进度输出（无实时进度消息）|
 | `--timeout <seconds>` | 超时时间（秒）（默认：7200 = 2 小时）|
 | `--cleanup` | 清理旧日志文件 |
 | `--force` | 强制覆盖无需确认（用于 `init`）|
@@ -237,6 +290,7 @@ codeagent-wrapper init --force  # 无需确认直接覆盖
 | `CODEX_TIMEOUT` | 超时值。**如果 >10000，视为毫秒；否则为秒** | 7200（秒）|
 | `CODEAGENT_SKIP_PERMISSIONS` | 设置为**任何非空值**时跳过权限 | (未设置) |
 | `CODEAGENT_MAX_PARALLEL_WORKERS` | 最大并行 worker 数。0 = 无限制 | min(100, cpuCount*4) |
+| `CODEAGENT_QUIET` | 设置为 `1` 时隐藏进度输出 | (未设置) |
 | `CODEAGENT_ASCII_MODE` | 设置后使用 ASCII 符号而非 Unicode | (未设置) |
 | `CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS` | 日志关闭超时（毫秒）| 5000 |
 
@@ -308,6 +362,30 @@ cat ~/.codeagent/logs/codeagent-<timestamp>.log
 tail -f ~/.codeagent/logs/codeagent-*.log
 ```
 
+### 后端输出调试
+
+如果需要查看后端的原始 stderr 输出以进行调试：
+
+```bash
+# 显示后端 stderr 输出（带 [BACKEND] 前缀）
+codeagent-wrapper --backend-output "你的任务"
+
+# 启用调试模式（自动启用后端输出）
+codeagent-wrapper --debug "你的任务"
+
+# 使用环境变量
+export CODEAGENT_BACKEND_OUTPUT=1
+export CODEAGENT_DEBUG=1
+codeagent-wrapper "你的任务"
+```
+
+**注意**：
+- `--backend-output` 会转发后端进程的 stderr 到你的终端
+- `--debug` 模式会自动启用 `--backend-output`
+- 输出会添加 `[BACKEND]` 前缀以区分
+- 如果终端支持 TTY，会保留 ANSI 颜色代码
+- 这在排查后端问题时非常有用
+
 ### 清理
 
 ```bash
@@ -334,6 +412,36 @@ codeagent-wrapper --cleanup
 | 124 | 超时 |
 | 127 | 命令未找到（后端未安装）|
 | 130 | 中断（SIGINT/SIGTERM）|
+
+## 性能
+
+codeagent-wrapper 经过优化，执行速度快：
+
+- **JSON 解析**：吞吐量 >60,000 events/sec
+- **智能缓冲**：优先级刷新，减少内存占用
+- **启动跟踪**：提供详细的性能指标
+
+**启用性能指标**：
+
+```bash
+# 输出结构化性能数据
+CODEAGENT_PERFORMANCE_METRICS=1 codeagent-wrapper "task" 2>&1 | grep metric
+
+# 示例输出：
+# {"metric":"task_execution","startup_ms":45.23,"total_ms":2345.67,"backend":"claude"}
+```
+
+**性能调优选项**：
+
+```bash
+# 调整日志刷新间隔（默认：200ms）
+export CODEAGENT_LOGGER_FLUSH_INTERVAL_MS=100
+
+# 调整日志队列大小（默认：100 条）
+export CODEAGENT_LOGGER_QUEUE_SIZE=50
+```
+
+详细的性能指南和基准测试请参阅 [docs/PERFORMANCE.md](docs/PERFORMANCE.md)。
 
 ## 架构
 

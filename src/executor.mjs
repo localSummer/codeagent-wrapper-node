@@ -3,6 +3,7 @@
  */
 
 import { spawn } from 'child_process';
+import { performance } from 'perf_hooks';
 import * as fs from 'fs/promises';
 import { parseJSONStream } from './parser.mjs';
 import { setupSignalHandlers, forwardSignal, getSignalExitCode } from './signal.mjs';
@@ -138,6 +139,33 @@ function detectProgressFromEvent(event, backendType) {
 }
 
 /**
+ * Forward backend stderr output to process.stderr with [BACKEND] prefix
+ * @param {string} chunk - Stderr chunk
+ * @param {Logger} logger - Logger instance
+ */
+function forwardBackendOutput(chunk, logger) {
+  // Split into lines while preserving line endings
+  const lines = chunk.split('\n');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Skip empty lines (except the last one if it's empty, which means chunk ended with \n)
+    if (line === '' && i === lines.length - 1) {
+      continue;
+    }
+    
+    // Preserve ANSI color codes if TTY, strip otherwise
+    let output = line;
+    if (!process.stderr.isTTY) {
+      output = output.replace(/\x1b\[[0-9;]*m/g, '');
+    }
+    
+    // Add [BACKEND] prefix and write to stderr
+    process.stderr.write(`[BACKEND] ${output}\n`);
+  }
+}
+
+/**
  * Run a single task
  * @param {TaskSpec} taskSpec - Task specification
  * @param {Backend} backend - Backend to use
@@ -146,6 +174,7 @@ function detectProgressFromEvent(event, backendType) {
  * @param {Logger} [options.logger] - Logger instance
  * @param {AbortSignal} [options.signal] - Abort signal
  * @param {function(ProgressEvent): void} [options.onProgress] - Progress callback
+ * @param {boolean} [options.backendOutput] - Forward backend stderr output
  * @returns {Promise<TaskResult>}
  */
 export async function runTask(taskSpec, backend, options = {}) {
@@ -153,10 +182,20 @@ export async function runTask(taskSpec, backend, options = {}) {
     timeout = 7200000,
     logger = nullLogger,
     signal: externalSignal,
-    onProgress = null
+    onProgress = null,
+    backendOutput = false
   } = options;
 
   const taskId = taskSpec.id || 'main';
+  
+  // Performance: Track startup timing
+  const perfMetrics = {
+    taskStart: performance.now(),
+    envPrepStart: 0,
+    spawnStart: 0,
+    firstOutputTime: 0
+  };
+  
   logger.info(`Starting task: ${taskId}`);
 
   // Notify task started
@@ -189,19 +228,30 @@ export async function runTask(taskSpec, backend, options = {}) {
   // Determine if we should use stdin
   const useStdin = shouldUseStdin(effectiveTask, false, taskSpec.useStdin);
 
+  // Performance: Measure environment preparation
+  perfMetrics.envPrepStart = performance.now();
+  
   // Build arguments
   const targetArg = useStdin ? '-' : effectiveTask;
   const args = backend.buildArgs(taskSpec, targetArg);
   const command = backend.command();
 
+  const envPrepDuration = performance.now() - perfMetrics.envPrepStart;
+  logger.debug(`Environment prepared in ${envPrepDuration.toFixed(2)}ms`);
   logger.info(`Executing: ${command} ${args.join(' ')}`);
 
+  // Performance: Measure spawn time
+  perfMetrics.spawnStart = performance.now();
+  
   // Spawn process
   const child = spawn(command, args, {
     cwd: taskSpec.workDir || process.cwd(),
     env: { ...process.env },
     stdio: ['pipe', 'pipe', 'pipe']
   });
+  
+  const spawnDuration = performance.now() - perfMetrics.spawnStart;
+  logger.debug(`Process spawned in ${spawnDuration.toFixed(2)}ms`);
 
   // Track if we've been interrupted
   let interrupted = false;
@@ -243,15 +293,31 @@ export async function runTask(taskSpec, backend, options = {}) {
   }
 
   // T3.2: Collect stderr using array buffer instead of string concatenation
+  // Performance: Track first output time
   const stderrChunks = [];
   let stderrSize = 0;
+  let firstOutput = false;
+  
   child.stderr.on('data', (data) => {
+    // Performance: Record first output time
+    if (!firstOutput) {
+      perfMetrics.firstOutputTime = performance.now();
+      const startupLatency = perfMetrics.firstOutputTime - perfMetrics.spawnStart;
+      logger.debug(`First output received in ${startupLatency.toFixed(2)}ms`);
+      firstOutput = true;
+    }
+    
     const chunk = data.toString();
     stderrChunks.push(chunk);
     stderrSize += chunk.length;
     // Periodically clean up old chunks when exceeding buffer size
     while (stderrSize > STDERR_BUFFER_SIZE * 2 && stderrChunks.length > 1) {
       stderrSize -= stderrChunks.shift().length;
+    }
+
+    // Forward backend stderr output if enabled
+    if (backendOutput) {
+      forwardBackendOutput(chunk, logger);
     }
   });
 
@@ -335,6 +401,23 @@ export async function runTask(taskSpec, backend, options = {}) {
     } catch (error) {
       logger.error(`Progress completed callback error: ${error.message}`);
     }
+  }
+
+  // Performance: Output metrics if enabled
+  if (process.env.CODEAGENT_PERFORMANCE_METRICS === '1') {
+    const totalDuration = performance.now() - perfMetrics.taskStart;
+    const startupDuration = perfMetrics.firstOutputTime > 0 
+      ? perfMetrics.firstOutputTime - perfMetrics.spawnStart 
+      : 0;
+    
+    console.error(JSON.stringify({
+      metric: 'task_execution',
+      task_id: taskId,
+      startup_ms: Math.round(startupDuration * 100) / 100,
+      total_ms: Math.round(totalDuration * 100) / 100,
+      backend: backend.name(),
+      timestamp: new Date().toISOString()
+    }));
   }
 
   return {
@@ -496,13 +579,15 @@ async function withConcurrencyLimit(tasks, limit, fn) {
  * @param {number} [options.timeout] - Timeout per task in milliseconds
  * @param {boolean} [options.fullOutput] - Include full output
  * @param {Logger} [options.logger] - Logger instance
+ * @param {boolean} [options.backendOutput] - Forward backend stderr output
  * @returns {Promise<TaskResult[]>}
  */
 export async function runParallel(tasks, options = {}) {
   const { 
     maxWorkers = 0, 
     timeout = 7200000,
-    logger = nullLogger 
+    logger = nullLogger,
+    backendOutput = false
   } = options;
 
   // T1.2: Using static imports from top of file (selectBackend, getAgentConfig)
@@ -557,7 +642,7 @@ export async function runParallel(tasks, options = {}) {
         return runTask(
           { ...task, backend, model },
           selectedBackend,
-          { timeout, logger }
+          { timeout, logger, backendOutput }
         );
       }
     );
