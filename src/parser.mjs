@@ -3,6 +3,7 @@
  */
 
 import * as readline from 'readline';
+import { Transform } from 'stream';
 
 // T2.2: Maximum message size to prevent memory exhaustion (10MB)
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024;
@@ -199,7 +200,105 @@ export function isCompletionEvent(event, backendType) {
 }
 
 /**
- * Parse JSON stream from readable stream
+ * Transform stream for efficient JSON line parsing
+ * Reduces overhead by processing chunks as Buffers before string conversion
+ */
+class JSONLineTransform extends Transform {
+  constructor() {
+    super({ objectMode: true });
+    this.buffer = Buffer.alloc(0);
+    // Pre-computed byte values for performance
+    this.NEWLINE = 0x0A;
+    this.CARRIAGE_RETURN = 0x0D;
+    this.OPEN_BRACE = 0x7B; // '{'
+    this.OPEN_BRACKET = 0x5B; // '['
+    this.SPACE = 0x20;
+    this.TAB = 0x09;
+  }
+
+  /**
+   * Find first non-whitespace byte
+   * @param {Buffer} buf 
+   * @param {number} start 
+   * @param {number} end 
+   * @returns {number} Index of first non-whitespace, or -1
+   */
+  _findFirstNonWhitespace(buf, start, end) {
+    for (let i = start; i < end; i++) {
+      const byte = buf[i];
+      if (byte !== this.SPACE && byte !== this.TAB && 
+          byte !== this.NEWLINE && byte !== this.CARRIAGE_RETURN) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  _transform(chunk, encoding, callback) {
+    // Ensure chunk is a Buffer
+    const bufferChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding);
+    
+    // Concatenate with existing buffer
+    this.buffer = Buffer.concat([this.buffer, bufferChunk]);
+    
+    let start = 0;
+    for (let i = 0; i < this.buffer.length; i++) {
+      if (this.buffer[i] === this.NEWLINE) {
+        // Found a complete line
+        const lineBuffer = this.buffer.slice(start, i);
+        start = i + 1;
+        
+        // Skip empty lines by checking first non-whitespace byte
+        const firstNonWs = this._findFirstNonWhitespace(lineBuffer, 0, lineBuffer.length);
+        if (firstNonWs === -1) continue;
+        
+        const firstByte = lineBuffer[firstNonWs];
+        // Quick check: only parse if starts with '{' or '['
+        if (firstByte !== this.OPEN_BRACE && firstByte !== this.OPEN_BRACKET) {
+          continue;
+        }
+        
+        // Convert to string only when we know it's likely JSON
+        const line = lineBuffer.toString('utf8', firstNonWs);
+        
+        try {
+          const event = JSON.parse(line);
+          this.push(event);
+        } catch {
+          // Skip invalid JSON
+        }
+      }
+    }
+    
+    // Keep remaining incomplete line in buffer
+    this.buffer = this.buffer.slice(start);
+    callback();
+  }
+
+  _flush(callback) {
+    // Process any remaining data
+    if (this.buffer.length > 0) {
+      const firstNonWs = this._findFirstNonWhitespace(this.buffer, 0, this.buffer.length);
+      if (firstNonWs !== -1) {
+        const firstByte = this.buffer[firstNonWs];
+        if (firstByte === this.OPEN_BRACE || firstByte === this.OPEN_BRACKET) {
+          const line = this.buffer.toString('utf8', firstNonWs);
+          try {
+            const event = JSON.parse(line);
+            this.push(event);
+          } catch {
+            // Ignore parse error
+          }
+        }
+      }
+    }
+    callback();
+  }
+}
+
+/**
+ * Parse JSON stream from readable stream using Transform stream
+ * More efficient for high-throughput scenarios
  * @param {import('stream').Readable} stream - Input stream
  * @param {object} [options] - Options
  * @param {function(object, string): void} [options.onEvent] - Event callback
@@ -209,10 +308,8 @@ export function isCompletionEvent(event, backendType) {
 export async function parseJSONStream(stream, options = {}) {
   const { onEvent, onMessage } = options;
 
-  const rl = readline.createInterface({
-    input: stream,
-    crlfDelay: Infinity
-  });
+  const parser = new JSONLineTransform();
+  stream.pipe(parser);
 
   const messages = [];
   let messagesSize = 0; // T2.2: Track total message size
@@ -220,55 +317,37 @@ export async function parseJSONStream(stream, options = {}) {
   let detectedBackend = 'unknown';
   let cachedBackend = null; // Performance: Cache backend type after first detection
 
-  for await (const line of rl) {
-    const trimmed = line.trim();
-    
-    // Performance: Fast empty line skip
-    if (!trimmed) continue;
-
-    // Performance: Pre-check first character before attempting JSON.parse
-    const firstChar = trimmed[0];
-    if (!JSON_FIRST_CHARS.has(firstChar)) {
-      continue; // Skip non-JSON lines quickly
+  for await (const event of parser) {
+    // Performance: Use cached backend type if available
+    if (cachedBackend) {
+      detectedBackend = cachedBackend;
+    } else if (detectedBackend === 'unknown') {
+      detectedBackend = detectBackend(event);
+      cachedBackend = detectedBackend; // Cache for subsequent events
     }
 
-    try {
-      const event = JSON.parse(trimmed);
+    // Notify event callback
+    if (onEvent) {
+      onEvent(event, detectedBackend);
+    }
 
-      // Performance: Use cached backend type if available
-      if (cachedBackend) {
-        detectedBackend = cachedBackend;
-      } else if (detectedBackend === 'unknown') {
-        detectedBackend = detectBackend(event);
-        cachedBackend = detectedBackend; // Cache for subsequent events
+    // Extract message
+    const message = extractMessage(event, detectedBackend);
+    if (message) {
+      // T2.2: Only add message if within size limit
+      if (messagesSize + message.length <= MAX_MESSAGE_SIZE) {
+        messages.push(message);
+        messagesSize += message.length;
       }
-
-      // Notify event callback
-      if (onEvent) {
-        onEvent(event, detectedBackend);
+      if (onMessage) {
+        onMessage(message);
       }
+    }
 
-      // Extract message
-      const message = extractMessage(event, detectedBackend);
-      if (message) {
-        // T2.2: Only add message if within size limit
-        if (messagesSize + message.length <= MAX_MESSAGE_SIZE) {
-          messages.push(message);
-          messagesSize += message.length;
-        }
-        if (onMessage) {
-          onMessage(message);
-        }
-      }
-
-      // Extract session ID
-      const eventSessionId = extractSessionId(event, detectedBackend);
-      if (eventSessionId && !sessionId) {
-        sessionId = eventSessionId;
-      }
-
-    } catch {
-      // Skip non-JSON lines
+    // Extract session ID
+    const eventSessionId = extractSessionId(event, detectedBackend);
+    if (eventSessionId && !sessionId) {
+      sessionId = eventSessionId;
     }
   }
 
@@ -280,26 +359,16 @@ export async function parseJSONStream(stream, options = {}) {
 }
 
 /**
- * Async generator for parsing JSON stream
+ * Async generator for parsing JSON stream using Transform stream
  * @param {import('stream').Readable} stream - Input stream
  * @yields {object} Parsed events
  */
 export async function* parseJSONStreamGenerator(stream) {
-  const rl = readline.createInterface({
-    input: stream,
-    crlfDelay: Infinity
-  });
+  const parser = new JSONLineTransform();
+  stream.pipe(parser);
 
-  for await (const line of rl) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    try {
-      const event = JSON.parse(trimmed);
-      const backendType = detectBackend(event);
-      yield { event, backendType };
-    } catch {
-      // Skip non-JSON lines
-    }
+  for await (const event of parser) {
+    const backendType = detectBackend(event);
+    yield { event, backendType };
   }
 }

@@ -43,6 +43,7 @@ const execAsync = promisify(exec);
  * @property {boolean} fullOutput - Full output in parallel mode
  * @property {boolean} quiet - Suppress progress output
  * @property {boolean} backendOutput - Forward backend stderr output
+ * @property {boolean} minimalEnv - Use minimal environment variables
  * @property {boolean} debug - Enable debug mode
  */
 
@@ -58,6 +59,8 @@ const execAsync = promisify(exec);
  * @property {string} agent - Agent name
  * @property {string} promptFile - Prompt file path
  * @property {boolean} skipPermissions - Skip permissions
+ * @property {boolean} minimalEnv - Use minimal environment variables
+ * @property {boolean} useStdin - Use stdin for task input
  */
 
 /**
@@ -98,6 +101,7 @@ const DEFAULT_CONFIG = {
   parallel: false,
   fullOutput: false,
   quiet: false,
+  minimalEnv: false,
   backendOutput: false,
   debug: false
 };
@@ -142,6 +146,8 @@ export function parseCliArgs(args) {
       config.backendOutput = true;
     } else if (arg === '--debug') {
       config.debug = true;
+    } else if (arg === '--minimal-env') {
+      config.minimalEnv = true;
     } else if (arg === '-') {
       config.explicitStdin = true;
     }

@@ -312,14 +312,16 @@ export async function main(args) {
         backend: config.backend,
         model: config.model,
         promptFile: config.promptFile,
-        skipPermissions: config.skipPermissions
+        skipPermissions: config.skipPermissions,
+        minimalEnv: config.minimalEnv
       },
       backend,
       {
         timeout: config.timeout * 1000,
         logger,
         onProgress,
-        backendOutput: config.backendOutput
+        backendOutput: config.backendOutput,
+        minimalEnv: config.minimalEnv
       }
     );
 

@@ -8,9 +8,9 @@ import * as fs from 'fs/promises';
 import { parseJSONStream } from './parser.mjs';
 import { setupSignalHandlers, forwardSignal, getSignalExitCode } from './signal.mjs';
 import { filterOutput } from './filter.mjs';
-import { 
-  sanitizeOutput, 
-  shouldUseStdin, 
+import {
+  sanitizeOutput,
+  shouldUseStdin,
   extractCoverageFromLines,
   extractFilesChangedFromLines,
   extractTestResultsFromLines,
@@ -146,23 +146,74 @@ function detectProgressFromEvent(event, backendType) {
 function forwardBackendOutput(chunk, logger) {
   // Split into lines while preserving line endings
   const lines = chunk.split('\n');
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     // Skip empty lines (except the last one if it's empty, which means chunk ended with \n)
     if (line === '' && i === lines.length - 1) {
       continue;
     }
-    
+
     // Preserve ANSI color codes if TTY, strip otherwise
     let output = line;
     if (!process.stderr.isTTY) {
       output = output.replace(/\x1b\[[0-9;]*m/g, '');
     }
-    
+
     // Add [BACKEND] prefix and write to stderr
     process.stderr.write(`[BACKEND] ${output}\n`);
   }
+}
+
+/**
+ * Essential environment variables for AI CLI backends
+ */
+const ESSENTIAL_ENV_VARS = [
+  'PATH', 'HOME', 'USER', 'SHELL', 'TERM',
+  'LANG', 'LC_ALL', 'LC_CTYPE',
+  // AI backend API keys
+  'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
+  'GOOGLE_API_KEY', 'AZURE_OPENAI_API_KEY',
+  // Proxy settings
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy',
+  // Common development tools
+  'NODE_PATH', 'PYTHONPATH', 'GEM_PATH', 'GOPATH',
+  // Terminal and display
+  'DISPLAY', 'COLORTERM', 'TERM_PROGRAM',
+  // SSH and auth
+  'SSH_AUTH_SOCK', 'GPG_AGENT_INFO',
+  // Codex/Codeagent specific
+  'CODEX_TIMEOUT', 'CODEX_MODEL', 'CODEX_BACKEND',
+  'CODEAGENT_QUIET', 'CODEAGENT_ASCII_MODE', 'CODEAGENT_PERFORMANCE_METRICS'
+];
+
+/**
+ * Build process environment based on minimalEnv setting
+ * @param {boolean} minimalEnv - Whether to use minimal environment
+ * @returns {object} Environment object
+ */
+function buildProcessEnv(minimalEnv) {
+  if (!minimalEnv) {
+    return { ...process.env };
+  }
+
+  // Build minimal environment with only essential variables
+  const env = {};
+  for (const key of ESSENTIAL_ENV_VARS) {
+    if (process.env[key] !== undefined) {
+      env[key] = process.env[key];
+    }
+  }
+
+  // Also include any environment variables that start with known prefixes
+  const prefixes = ['CODEX_', 'CODEAGENT_', 'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'GOOGLE_'];
+  for (const [key, value] of Object.entries(process.env)) {
+    if (prefixes.some(prefix => key.startsWith(prefix))) {
+      env[key] = value;
+    }
+  }
+
+  return env;
 }
 
 /**
@@ -183,11 +234,12 @@ export async function runTask(taskSpec, backend, options = {}) {
     logger = nullLogger,
     signal: externalSignal,
     onProgress = null,
-    backendOutput = false
+    backendOutput = false,
+    minimalEnv = false
   } = options;
 
   const taskId = taskSpec.id || 'main';
-  
+
   // Performance: Track startup timing
   const perfMetrics = {
     taskStart: performance.now(),
@@ -195,7 +247,7 @@ export async function runTask(taskSpec, backend, options = {}) {
     spawnStart: 0,
     firstOutputTime: 0
   };
-  
+
   logger.info(`Starting task: ${taskId}`);
 
   // Notify task started
@@ -230,7 +282,7 @@ export async function runTask(taskSpec, backend, options = {}) {
 
   // Performance: Measure environment preparation
   perfMetrics.envPrepStart = performance.now();
-  
+
   // Build arguments
   const targetArg = useStdin ? '-' : effectiveTask;
   const args = backend.buildArgs(taskSpec, targetArg);
@@ -242,14 +294,17 @@ export async function runTask(taskSpec, backend, options = {}) {
 
   // Performance: Measure spawn time
   perfMetrics.spawnStart = performance.now();
-  
+
+  // Build environment (use minimal env if requested for performance)
+  const processEnv = buildProcessEnv(minimalEnv || taskSpec.minimalEnv);
+
   // Spawn process
   const child = spawn(command, args, {
     cwd: taskSpec.workDir || process.cwd(),
-    env: { ...process.env },
+    env: processEnv,
     stdio: ['pipe', 'pipe', 'pipe']
   });
-  
+
   const spawnDuration = performance.now() - perfMetrics.spawnStart;
   logger.debug(`Process spawned in ${spawnDuration.toFixed(2)}ms`);
 
@@ -292,12 +347,12 @@ export async function runTask(taskSpec, backend, options = {}) {
     child.stdin.end();
   }
 
-  // T3.2: Collect stderr using array buffer instead of string concatenation
+  // T3.2: Collect stderr using Buffer array to avoid premature string conversion
   // Performance: Track first output time
-  const stderrChunks = [];
+  const stderrBuffers = [];
   let stderrSize = 0;
   let firstOutput = false;
-  
+
   child.stderr.on('data', (data) => {
     // Performance: Record first output time
     if (!firstOutput) {
@@ -306,18 +361,18 @@ export async function runTask(taskSpec, backend, options = {}) {
       logger.debug(`First output received in ${startupLatency.toFixed(2)}ms`);
       firstOutput = true;
     }
-    
-    const chunk = data.toString();
-    stderrChunks.push(chunk);
-    stderrSize += chunk.length;
+
+    // Store Buffer directly to avoid string conversion overhead
+    stderrBuffers.push(data);
+    stderrSize += data.length;
     // Periodically clean up old chunks when exceeding buffer size
-    while (stderrSize > STDERR_BUFFER_SIZE * 2 && stderrChunks.length > 1) {
-      stderrSize -= stderrChunks.shift().length;
+    while (stderrSize > STDERR_BUFFER_SIZE * 2 && stderrBuffers.length > 1) {
+      stderrSize -= stderrBuffers.shift().length;
     }
 
-    // Forward backend stderr output if enabled
+    // Forward backend stderr output if enabled (convert to string only when needed)
     if (backendOutput) {
-      forwardBackendOutput(chunk, logger);
+      forwardBackendOutput(data.toString(), logger);
     }
   });
 
@@ -385,8 +440,10 @@ export async function runTask(taskSpec, backend, options = {}) {
   // T1.3: Extract all metrics in a single pass
   const metrics = extractAllMetrics(lines);
 
-  // T3.2: Build final stderr buffer
-  const stderrBuffer = stderrChunks.join('').slice(-STDERR_BUFFER_SIZE);
+  // T3.2: Build final stderr buffer - concatenate Buffers then convert to string
+  const stderrBuffer = stderrBuffers.length > 0
+    ? Buffer.concat(stderrBuffers).slice(-STDERR_BUFFER_SIZE).toString()
+    : '';
 
   logger.info(`Task ${taskId} completed with exit code ${finalExitCode}`);
 
@@ -406,10 +463,10 @@ export async function runTask(taskSpec, backend, options = {}) {
   // Performance: Output metrics if enabled
   if (process.env.CODEAGENT_PERFORMANCE_METRICS === '1') {
     const totalDuration = performance.now() - perfMetrics.taskStart;
-    const startupDuration = perfMetrics.firstOutputTime > 0 
-      ? perfMetrics.firstOutputTime - perfMetrics.spawnStart 
+    const startupDuration = perfMetrics.firstOutputTime > 0
+      ? perfMetrics.firstOutputTime - perfMetrics.spawnStart
       : 0;
-    
+
     console.error(JSON.stringify({
       metric: 'task_execution',
       task_id: taskId,
@@ -583,8 +640,8 @@ async function withConcurrencyLimit(tasks, limit, fn) {
  * @returns {Promise<TaskResult[]>}
  */
 export async function runParallel(tasks, options = {}) {
-  const { 
-    maxWorkers = 0, 
+  const {
+    maxWorkers = 0,
     timeout = 7200000,
     logger = nullLogger,
     backendOutput = false
@@ -630,7 +687,7 @@ export async function runParallel(tasks, options = {}) {
         // Load agent config if specified
         let backend = task.backend;
         let model = task.model;
-        
+
         if (task.agent) {
           const agentConfig = getAgentConfig(task.agent);
           if (!backend) backend = agentConfig.backend;
@@ -690,7 +747,7 @@ export async function loadPromptFile(promptFile) {
   }
 
   const expandedPath = expandHome(promptFile);
-  
+
   try {
     const content = await fs.readFile(expandedPath, 'utf-8');
     return content.trim();
