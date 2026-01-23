@@ -293,6 +293,9 @@ codeagent-wrapper init --force  # 无需确认直接覆盖
 | `CODEAGENT_QUIET` | 设置为 `1` 时隐藏进度输出 | (未设置) |
 | `CODEAGENT_ASCII_MODE` | 设置后使用 ASCII 符号而非 Unicode | (未设置) |
 | `CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS` | 日志关闭超时（毫秒）| 5000 |
+| `CODEAGENT_BACKEND` | 默认后端：`codex`、`claude`、`gemini`、`opencode` | (未设置) |
+| `CODEAGENT_MODEL` | 默认使用的模型 | (未设置) |
+| `CODEAGENT_STDERR_BUFFER_SIZE` | stderr 缓冲大小（字节）| 65536（64KB）|
 
 ## 自定义 Agent 配置
 

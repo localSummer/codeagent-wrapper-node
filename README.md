@@ -293,6 +293,9 @@ codeagent-wrapper init --force  # Overwrite without confirmation
 | `CODEAGENT_QUIET` | Suppress progress output if set to `1` | (unset) |
 | `CODEAGENT_ASCII_MODE` | Use ASCII symbols instead of Unicode if set | (unset) |
 | `CODEAGENT_LOGGER_CLOSE_TIMEOUT_MS` | Logger close timeout in milliseconds | 5000 |
+| `CODEAGENT_BACKEND` | Default backend to use: `codex`, `claude`, `gemini`, `opencode` | (unset) |
+| `CODEAGENT_MODEL` | Default model to use | (unset) |
+| `CODEAGENT_STDERR_BUFFER_SIZE` | Stderr buffer size in bytes | 65536 (64KB) |
 
 ## Custom Agent Configuration
 
