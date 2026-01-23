@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S bun
 /**
  * CLI entry point for codeagent-wrapper
  * Unified wrapper for AI CLI backends (Codex, Claude, Gemini, Opencode)

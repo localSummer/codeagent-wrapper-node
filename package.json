@@ -16,9 +16,11 @@
     "./utils": "./src/utils.mjs"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "bun test test/*.test.mjs",
+    "test:node": "node --test test/*.test.mjs",
     "lint": "echo 'No linter configured'",
-    "start": "node bin/codeagent-wrapper.mjs"
+    "start": "node bin/codeagent-wrapper.mjs",
+    "start:bun": "bun bin/codeagent-wrapper.mjs"
   },
   "keywords": [
     "ai",
@@ -32,6 +34,7 @@
   "author": "localsummer",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
   }
 }
