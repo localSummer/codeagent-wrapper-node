@@ -59,7 +59,7 @@ codeagent-wrapper init
 
 ## 系统要求
 
-- Node.js >= 18.0.0
+- **运行时**: Node.js >= 18.0.0 **或** Bun >= 1.0.0
 - 至少安装一个 AI CLI 后端：
 
 | 后端 | 安装命令 | 文档 |

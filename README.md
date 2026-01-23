@@ -59,7 +59,7 @@ codeagent-wrapper init
 
 ## Requirements
 
-- Node.js >= 18.0.0
+- **Runtime**: Node.js >= 18.0.0 **or** Bun >= 1.0.0
 - One or more AI CLI backends installed:
 
 | Backend | Install Command | Documentation |
