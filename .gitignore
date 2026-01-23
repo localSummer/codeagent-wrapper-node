@@ -26,5 +26,6 @@ build/
 
 .claude
 .github
+.superset
 openspec
 AGENTS.md
