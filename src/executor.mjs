@@ -24,7 +24,14 @@ import { selectBackend } from './backend.mjs';
 import { getAgentConfig } from './agent-config.mjs';
 
 const FORCE_KILL_DELAY = 1000; // 1 second
-const STDERR_BUFFER_SIZE = 4096;
+
+/**
+ * Stderr buffer size - configurable via CODEAGENT_STDERR_BUFFER_SIZE env var
+ * Default: 64KB (increased from 4KB for better debugging context)
+ */
+const STDERR_BUFFER_SIZE = process.env.CODEAGENT_STDERR_BUFFER_SIZE
+  ? parseInt(process.env.CODEAGENT_STDERR_BUFFER_SIZE, 10)
+  : 65536; // 64KB default
 
 /**
  * Task execution progress stages
@@ -612,9 +619,10 @@ async function withConcurrencyLimit(tasks, limit, fn) {
   const executing = new Set();
 
   for (const task of tasks) {
-    const promise = fn(task).then(result => {
+    // Wrap in Promise.resolve().then() to handle both async and sync errors
+    // Use finally() to ensure cleanup happens even on synchronous throws
+    const promise = Promise.resolve().then(() => fn(task)).finally(() => {
       executing.delete(promise);
-      return result;
     });
 
     executing.add(promise);
@@ -637,6 +645,7 @@ async function withConcurrencyLimit(tasks, limit, fn) {
  * @param {boolean} [options.fullOutput] - Include full output
  * @param {Logger} [options.logger] - Logger instance
  * @param {boolean} [options.backendOutput] - Forward backend stderr output
+ * @param {boolean} [options.minimalEnv] - Use minimal environment variables
  * @returns {Promise<TaskResult[]>}
  */
 export async function runParallel(tasks, options = {}) {
@@ -644,7 +653,8 @@ export async function runParallel(tasks, options = {}) {
     maxWorkers = 0,
     timeout = 7200000,
     logger = nullLogger,
-    backendOutput = false
+    backendOutput = false,
+    minimalEnv = false
   } = options;
 
   // T1.2: Using static imports from top of file (selectBackend, getAgentConfig)
@@ -692,6 +702,9 @@ export async function runParallel(tasks, options = {}) {
           const agentConfig = getAgentConfig(task.agent);
           if (!backend) backend = agentConfig.backend;
           if (!model) model = agentConfig.model;
+          if (!task.reasoningEffort && agentConfig.reasoningEffort) {
+            task.reasoningEffort = agentConfig.reasoningEffort;
+          }
         }
 
         const selectedBackend = selectBackend(backend || 'codex');
@@ -699,7 +712,7 @@ export async function runParallel(tasks, options = {}) {
         return runTask(
           { ...task, backend, model },
           selectedBackend,
-          { timeout, logger, backendOutput }
+          { timeout, logger, backendOutput, minimalEnv }
         );
       }
     );

@@ -606,6 +606,16 @@ export function loadEnvConfig() {
     config.debug = true;
   }
 
+  // Default backend
+  if (process.env.CODEAGENT_BACKEND) {
+    config.backend = process.env.CODEAGENT_BACKEND;
+  }
+
+  // Default model
+  if (process.env.CODEAGENT_MODEL) {
+    config.model = process.env.CODEAGENT_MODEL;
+  }
+
   return config;
 }
 

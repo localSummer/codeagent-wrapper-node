@@ -103,6 +103,17 @@ Environment Variables:
   CODEAGENT_DEBUG                 Enable debug mode (auto-enables backend output)
                                   Values: Set to 1 to enable
                                   Example: export CODEAGENT_DEBUG=1
+
+  CODEAGENT_BACKEND               Default backend to use
+                                  Values: codex, claude, gemini, opencode
+                                  Example: export CODEAGENT_BACKEND=claude
+
+  CODEAGENT_MODEL                 Default model to use
+                                  Example: export CODEAGENT_MODEL=claude-opus-4-5-20251101
+
+  CODEAGENT_STDERR_BUFFER_SIZE    Stderr buffer size in bytes
+                                  Default: 65536 (64KB)
+                                  Example: export CODEAGENT_STDERR_BUFFER_SIZE=131072
 `;
 
 const HELP_EXAMPLES = `
@@ -220,13 +231,6 @@ export async function main(args) {
   let config = parseCliArgs(args);
   config = applyEnvConfigOverrides(config, envConfig, args);
 
-  // Validate configuration
-  try {
-    await validateConfig(config);
-  } catch (error) {
-    throw error; // Re-throw to be caught by bin/codeagent-wrapper.mjs
-  }
-
   // Handle parallel mode
   if (config.parallel) {
     const parallelConfig = await readParallelInput();
@@ -238,7 +242,8 @@ export async function main(args) {
         timeout: config.timeout * 1000,
         fullOutput: config.fullOutput,
         logger,
-        backendOutput: config.backendOutput
+        backendOutput: config.backendOutput,
+        minimalEnv: config.minimalEnv
       });
 
       // Output results
@@ -269,8 +274,12 @@ export async function main(args) {
     config.task = await readStdinTask();
   }
 
-  // Validate configuration
-  validateConfig(config);
+  // Validate configuration (after reading stdin and applying agent overrides)
+  try {
+    await validateConfig(config);
+  } catch (error) {
+    throw error; // Re-throw to be caught by bin/codeagent-wrapper.mjs
+  }
 
   // Load agent configuration if specified
   if (config.agent) {
@@ -278,6 +287,7 @@ export async function main(args) {
     if (!config.backend) config.backend = agentConfig.backend;
     if (!config.model) config.model = agentConfig.model;
     if (!config.promptFile) config.promptFile = agentConfig.promptFile;
+    if (!config.reasoningEffort) config.reasoningEffort = agentConfig.reasoningEffort;
   }
 
   // Select backend

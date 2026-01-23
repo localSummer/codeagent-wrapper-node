@@ -315,15 +315,19 @@ export async function parseJSONStream(stream, options = {}) {
   let messagesSize = 0; // T2.2: Track total message size
   let sessionId = '';
   let detectedBackend = 'unknown';
-  let cachedBackend = null; // Performance: Cache backend type after first detection
+  let cachedBackend = null; // Performance: Cache backend type after first valid detection
 
   for await (const event of parser) {
-    // Performance: Use cached backend type if available
+    // Performance: Use cached backend type if available and valid
     if (cachedBackend) {
       detectedBackend = cachedBackend;
     } else if (detectedBackend === 'unknown') {
       detectedBackend = detectBackend(event);
-      cachedBackend = detectedBackend; // Cache for subsequent events
+      // Only cache if we got a valid (non-unknown) detection
+      // This prevents first-event false positives from locking the backend type
+      if (detectedBackend !== 'unknown') {
+        cachedBackend = detectedBackend;
+      }
     }
 
     // Notify event callback
