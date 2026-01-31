@@ -1,7 +1,7 @@
 //! JSON parser benchmarks
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use tokio::io::BufReader;
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 // Note: This benchmark file is a placeholder.
 // The actual JsonStreamParser is in src/parser.rs
@@ -23,8 +23,8 @@ fn json_parsing_benchmark(c: &mut Criterion) {
             rt.block_on(async {
                 let reader = BufReader::new(sample_lines.as_bytes());
                 let mut count = 0;
-                let mut lines = tokio::io::AsyncBufReadExt::lines(reader);
-                while let Some(line) = tokio::io::AsyncBufReadExt::next_line(&mut lines).await.unwrap() {
+                let mut lines = reader.lines();
+                while let Ok(Some(line)) = lines.next_line().await {
                     let _: serde_json::Value = serde_json::from_str(&line).unwrap();
                     count += 1;
                 }
@@ -55,8 +55,8 @@ fn throughput_benchmark(c: &mut Criterion) {
             rt.block_on(async {
                 let reader = BufReader::new(sample_lines.as_bytes());
                 let mut count = 0;
-                let mut lines = tokio::io::AsyncBufReadExt::lines(reader);
-                while let Some(line) = tokio::io::AsyncBufReadExt::next_line(&mut lines).await.unwrap() {
+                let mut lines = reader.lines();
+                while let Ok(Some(line)) = lines.next_line().await {
                     if let Ok(_v) = serde_json::from_str::<serde_json::Value>(&line) {
                         count += 1;
                     }
