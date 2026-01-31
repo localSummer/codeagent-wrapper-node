@@ -9,6 +9,7 @@ use crate::cli::Cli;
 use crate::errors::ConfigError;
 
 /// Runtime configuration
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
 pub struct Config {
     /// Execution mode: "new" or "resume"

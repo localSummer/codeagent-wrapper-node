@@ -1,5 +1,7 @@
 //! CLI integration tests
 
+#![allow(deprecated)]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 

@@ -1,5 +1,7 @@
 //! Output filtering utilities
 
+#![allow(dead_code)]
+
 use regex::Regex;
 
 /// Output filter for cleaning backend output

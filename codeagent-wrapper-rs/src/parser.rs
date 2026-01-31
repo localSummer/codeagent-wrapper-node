@@ -1,5 +1,7 @@
 //! JSON stream parser for backend output
 
+#![allow(dead_code)]
+
 use tokio::io::{AsyncBufRead, AsyncBufReadExt};
 use tracing::trace;
 
@@ -117,18 +119,16 @@ pub fn is_progress_event(value: &serde_json::Value, backend_type: BackendType) -
         BackendType::Claude => value
             .get("type")
             .and_then(|t| t.as_str())
-            .map_or(false, |t| {
-                t == "assistant" || t == "content_block_delta" || t == "tool_use"
-            }),
+            .is_some_and(|t| t == "assistant" || t == "content_block_delta" || t == "tool_use"),
         BackendType::Codex => value
             .get("event")
             .and_then(|e| e.as_str())
-            .map_or(false, |e| e == "message" || e == "tool_call"),
+            .is_some_and(|e| e == "message" || e == "tool_call"),
         BackendType::Gemini => value.get("candidates").is_some(),
         BackendType::Opencode => value
             .get("type")
             .and_then(|t| t.as_str())
-            .map_or(false, |t| t == "message" || t == "tool_use"),
+            .is_some_and(|t| t == "message" || t == "tool_use"),
         BackendType::Unknown => false,
     }
 }

@@ -1,5 +1,7 @@
 //! Task executor for running backend commands
 
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use std::process::Stdio;
 use std::sync::Arc;

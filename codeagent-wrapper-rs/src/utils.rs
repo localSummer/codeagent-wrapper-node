@@ -1,5 +1,7 @@
 //! Utility functions
 
+#![allow(dead_code)]
+
 use anyhow::Result;
 use serde_json::{Value, json};
 use std::env;
@@ -99,10 +101,10 @@ pub fn format_progress_message(event: &Value, quiet: bool) -> Option<String> {
 
 /// Expand ~ to home directory
 pub fn expand_home(path: &str) -> String {
-    if path.starts_with("~/") {
-        if let Some(home) = dirs::home_dir() {
-            return format!("{}{}", home.display(), &path[1..]);
-        }
+    if path.starts_with("~/")
+        && let Some(home) = dirs::home_dir()
+    {
+        return format!("{}{}", home.display(), &path[1..]);
     }
     path.to_string()
 }

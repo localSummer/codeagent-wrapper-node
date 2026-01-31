@@ -1,5 +1,7 @@
 //! Error types for codeagent-wrapper
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Configuration-related errors

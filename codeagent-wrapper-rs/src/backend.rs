@@ -205,6 +205,7 @@ pub fn select_backend(name: Option<&str>) -> Result<Arc<dyn Backend>> {
 }
 
 /// Get list of available backend names
+#[allow(dead_code)]
 pub fn get_available_backends() -> Vec<&'static str> {
     vec!["codex", "claude", "gemini", "opencode"]
 }
