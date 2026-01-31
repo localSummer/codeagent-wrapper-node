@@ -131,20 +131,25 @@ jobs:
         with:
           path: artifacts
       
-      - name: Create checksums
+      - name: Prepare release files
         run: |
-          cd artifacts
-          for dir in */; do
-            cd "$dir"
-            sha256sum * > checksums.txt 2>/dev/null || true
-            cd ..
+          mkdir -p release
+          # Move binaries to release directory and create single checksums file
+          for dir in artifacts/*/; do
+            for file in "$dir"*; do
+              if [ -f "$file" ] && [ "$(basename "$file")" != "checksums.txt" ]; then
+                cp "$file" release/
+              fi
+            done
           done
+          # Create single checksums file
+          cd release
+          sha256sum * > checksums.txt
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            artifacts/**/*
+          files: release/*
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
