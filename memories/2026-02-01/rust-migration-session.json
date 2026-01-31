@@ -207,6 +207,21 @@
       "tools_mentioned": ["otool", "ldd"],
       "urls_mentioned": [],
       "target_agents": []
+    },
+    {
+      "type": "learning",
+      "category": "workflow",
+      "title": "GitHub Release latest URL 自动指向最新版本",
+      "content": "使用 /releases/latest/download/ 路径可以自动下载最新版本，无需手动修改版本号。格式：https://github.com/{owner}/{repo}/releases/latest/download/{filename}。适合用于自动更新脚本。",
+      "source_chunk": "**User:** 当我发布了一个新包，本地如何更新\n**Assistant:** curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-apple-darwin... 提示：/releases/latest/download/ 会自动指向最新版本，无需手动修改版本号。",
+      "reasoning": "这个 URL 模式对于 CLI 工具的自动更新非常有用，用户无需关心具体版本号。",
+      "confidence_score": 100,
+      "related_entities": [
+        {"type": "project", "raw": "codeagent-wrapper-rs", "slug": "codeagent-wrapper-rs", "resolved": true}
+      ],
+      "tools_mentioned": ["curl", "GitHub Release"],
+      "urls_mentioned": ["https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/"],
+      "target_agents": []
     }
   ],
   "suggestions": [
