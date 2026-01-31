@@ -192,6 +192,21 @@
       "tools_mentioned": ["GitHub Release", "curl", "chmod"],
       "urls_mentioned": ["https://github.com/localSummer/codeagent-wrapper-node/releases/tag/v1.0.0-rust"],
       "target_agents": []
+    },
+    {
+      "type": "insight",
+      "category": "technical",
+      "title": "Rust 二进制无需运行时依赖",
+      "content": "Rust 编译的二进制是静态链接的，不需要 Rust 环境、Cargo 或任何运行时。只依赖系统基础库（libc、libSystem）。对比 Node.js 版需要 Node.js 18+，Rust 版实现了真正的单文件分发、零依赖部署。",
+      "source_chunk": "**User:** 下载完成并配置后，在运行时是否需要rust的配套环境，还是可以直接运行\n**Assistant:** ✅ 可以直接运行，无需任何依赖！Rust 编译的二进制是静态链接的，不需要：❌ Rust 环境 ❌ Cargo ❌ 任何运行时 ❌ Node.js",
+      "reasoning": "这是 Rust CLI 工具相对于解释型语言（Node.js、Python）的核心优势之一：部署简单，用户体验好。",
+      "confidence_score": 100,
+      "related_entities": [
+        {"type": "project", "raw": "codeagent-wrapper-rs", "slug": "codeagent-wrapper-rs", "resolved": true}
+      ],
+      "tools_mentioned": ["otool", "ldd"],
+      "urls_mentioned": [],
+      "target_agents": []
     }
   ],
   "suggestions": [
