@@ -1,9 +1,9 @@
 //! Task executor for running backend commands
 
+use anyhow::{Context, Result};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use anyhow::{Context, Result};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::time::timeout;
@@ -53,21 +53,21 @@ impl TaskExecutor {
             logger: Logger::new(None),
         })
     }
-    
+
     /// Run the task
     pub async fn run(&self) -> Result<TaskResult> {
         let start = Instant::now();
-        
+
         // Build command arguments
         let target = self.get_target()?;
         let args = self.backend.build_args(&self.config, &target);
-        
+
         info!(
             backend = self.backend.name(),
             args = ?args,
             "Executing task"
         );
-        
+
         // Spawn process
         let mut child = Command::new(self.backend.command())
             .args(&args)
@@ -77,11 +77,11 @@ impl TaskExecutor {
             .stderr(Stdio::piped())
             .spawn()
             .with_context(|| format!("Failed to spawn {}", self.backend.command()))?;
-        
+
         // Setup signal handler
         let child_id = child.id().unwrap_or(0);
         let _signal_guard = setup_signal_handler(child_id);
-        
+
         // Write to stdin if using stdin mode
         if let Some(mut stdin) = child.stdin.take() {
             if self.config.task.len() > 4096 {
@@ -89,12 +89,12 @@ impl TaskExecutor {
             }
             drop(stdin);
         }
-        
+
         // Read stdout with JSON parser
         let stdout = child.stdout.take().unwrap();
         let stdout_reader = BufReader::new(stdout);
         let mut parser = JsonStreamParser::new(stdout_reader);
-        
+
         // Collect stderr in background
         let stderr = child.stderr.take().unwrap();
         let stderr_handle = tokio::spawn(async move {
@@ -103,12 +103,12 @@ impl TaskExecutor {
             while reader.read_line(&mut buf).await.unwrap_or(0) > 0 {}
             buf
         });
-        
+
         // Parse events with timeout
         let timeout_duration = Duration::from_secs(self.config.timeout);
         let mut events = Vec::new();
         let mut session_id = None;
-        
+
         let parse_result = timeout(timeout_duration, async {
             while let Some(event) = parser.next_event().await {
                 match event {
@@ -124,20 +124,21 @@ impl TaskExecutor {
                     }
                 }
             }
-        }).await;
-        
+        })
+        .await;
+
         if parse_result.is_err() {
             warn!("Task timed out after {} seconds", self.config.timeout);
             let _ = child.kill().await;
         }
-        
+
         // Wait for process
         let status = child.wait().await?;
         let stderr_output = stderr_handle.await.unwrap_or_default();
-        
+
         let duration = start.elapsed();
         let exit_code = status.code().unwrap_or(-1);
-        
+
         info!(
             success = status.success(),
             exit_code = exit_code,
@@ -145,7 +146,7 @@ impl TaskExecutor {
             events_count = events.len(),
             "Task completed"
         );
-        
+
         Ok(TaskResult {
             success: status.success(),
             exit_code,
@@ -157,7 +158,7 @@ impl TaskExecutor {
             coverage: None,
         })
     }
-    
+
     /// Get the target argument (task or prompt file content)
     fn get_target(&self) -> Result<String> {
         if let Some(ref prompt_file) = self.config.prompt_file {
@@ -173,41 +174,44 @@ impl TaskExecutor {
 pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec<TaskResult>> {
     use std::collections::HashMap;
     use tokio::sync::mpsc;
-    
-    let max_workers = cli.max_parallel_workers
+
+    let max_workers = cli
+        .max_parallel_workers
         .unwrap_or_else(crate::config::get_default_max_parallel_workers);
-    
+
     debug!(
         task_count = config.tasks.len(),
         max_workers = max_workers,
         "Starting parallel execution"
     );
-    
+
     // Build dependency graph
     let mut results: HashMap<String, TaskResult> = HashMap::new();
     let mut pending: Vec<TaskSpec> = config.tasks.clone();
     let (tx, mut rx) = mpsc::channel::<(String, TaskResult)>(max_workers);
-    
+
     let mut running = 0;
-    
+
     while !pending.is_empty() || running > 0 {
         // Start tasks with satisfied dependencies
         while running < max_workers && !pending.is_empty() {
             let ready_idx = pending.iter().position(|task| {
-                task.dependencies.iter().all(|dep| results.contains_key(dep))
+                task.dependencies
+                    .iter()
+                    .all(|dep| results.contains_key(dep))
             });
-            
+
             if let Some(idx) = ready_idx {
                 let task = pending.remove(idx);
                 let task_id = task.id.clone();
                 let tx = tx.clone();
                 let cli = cli.clone();
-                
+
                 tokio::spawn(async move {
                     let result = run_single_task(&cli, task).await;
                     let _ = tx.send((task_id, result.unwrap_or_default())).await;
                 });
-                
+
                 running += 1;
             } else if running == 0 {
                 // No tasks can run and none are running - circular dependency
@@ -219,7 +223,7 @@ pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec
                 break;
             }
         }
-        
+
         // Wait for a task to complete
         if running > 0 {
             if let Some((task_id, result)) = rx.recv().await {
@@ -228,9 +232,11 @@ pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec
             }
         }
     }
-    
+
     // Return results in original order
-    Ok(config.tasks.iter()
+    Ok(config
+        .tasks
+        .iter()
         .filter_map(|t| results.remove(&t.id))
         .collect())
 }
@@ -238,10 +244,18 @@ pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec
 /// Run a single task from parallel config
 async fn run_single_task(cli: &Cli, spec: TaskSpec) -> Result<TaskResult> {
     let config = Config {
-        mode: if spec.session_id.is_some() { "resume" } else { "new" }.to_string(),
+        mode: if spec.session_id.is_some() {
+            "resume"
+        } else {
+            "new"
+        }
+        .to_string(),
         task: spec.task,
         session_id: spec.session_id,
-        work_dir: spec.work_dir.map(Into::into).unwrap_or_else(|| std::env::current_dir().unwrap()),
+        work_dir: spec
+            .work_dir
+            .map(Into::into)
+            .unwrap_or_else(|| std::env::current_dir().unwrap()),
         model: spec.model.or_else(|| cli.model.clone()),
         backend: spec.backend.or_else(|| cli.backend.clone()),
         agent: spec.agent.or_else(|| cli.agent.clone()),
@@ -252,7 +266,7 @@ async fn run_single_task(cli: &Cli, spec: TaskSpec) -> Result<TaskResult> {
         backend_output: cli.backend_output,
         debug: cli.debug,
     };
-    
+
     let backend = crate::backend::select_backend(config.backend.as_deref())?;
     let executor = TaskExecutor::new(backend, &config)?;
     executor.run().await
@@ -260,7 +274,8 @@ async fn run_single_task(cli: &Cli, spec: TaskSpec) -> Result<TaskResult> {
 
 /// Extract session ID from a JSON event
 fn extract_session_id(value: &serde_json::Value) -> Option<String> {
-    value.get("session_id")
+    value
+        .get("session_id")
         .or_else(|| value.get("sessionId"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
@@ -274,10 +289,10 @@ mod tests {
     fn test_extract_session_id() {
         let value = serde_json::json!({"session_id": "abc123"});
         assert_eq!(extract_session_id(&value), Some("abc123".to_string()));
-        
+
         let value = serde_json::json!({"sessionId": "def456"});
         assert_eq!(extract_session_id(&value), Some("def456".to_string()));
-        
+
         let value = serde_json::json!({"other": "data"});
         assert_eq!(extract_session_id(&value), None);
     }

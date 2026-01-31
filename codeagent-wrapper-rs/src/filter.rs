@@ -16,10 +16,10 @@ impl OutputFilter {
             // Control characters
             Regex::new(r"[\x00-\x08\x0b\x0c\x0e-\x1f]").unwrap(),
         ];
-        
+
         Self { patterns }
     }
-    
+
     /// Filter output string
     pub fn filter(&self, input: &str) -> String {
         let mut result = input.to_string();
@@ -52,7 +52,7 @@ pub fn extract_coverage(output: &str) -> Option<f64> {
         r"(\d+(?:\.\d+)?)\s*%\s*(?:coverage|covered)",
         r"All files\s*\|\s*(\d+(?:\.\d+)?)",
     ];
-    
+
     for pattern in patterns {
         if let Ok(re) = Regex::new(pattern) {
             if let Some(caps) = re.captures(output) {
@@ -64,7 +64,7 @@ pub fn extract_coverage(output: &str) -> Option<f64> {
             }
         }
     }
-    
+
     None
 }
 
@@ -75,7 +75,7 @@ pub fn extract_files_changed(output: &str) -> Option<usize> {
         r"Changed\s*(\d+)\s*files?",
         r"Modified:\s*(\d+)",
     ];
-    
+
     for pattern in patterns {
         if let Ok(re) = Regex::new(pattern) {
             if let Some(caps) = re.captures(output) {
@@ -87,7 +87,7 @@ pub fn extract_files_changed(output: &str) -> Option<usize> {
             }
         }
     }
-    
+
     None
 }
 
@@ -96,13 +96,22 @@ pub fn extract_test_results(output: &str) -> Option<(usize, usize, usize)> {
     // Pattern: X passed, Y failed, Z skipped
     if let Ok(re) = Regex::new(r"(\d+)\s*passed.*?(\d+)\s*failed.*?(\d+)\s*skipped") {
         if let Some(caps) = re.captures(output) {
-            let passed = caps.get(1).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
-            let failed = caps.get(2).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
-            let skipped = caps.get(3).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+            let passed = caps
+                .get(1)
+                .and_then(|m| m.as_str().parse().ok())
+                .unwrap_or(0);
+            let failed = caps
+                .get(2)
+                .and_then(|m| m.as_str().parse().ok())
+                .unwrap_or(0);
+            let skipped = caps
+                .get(3)
+                .and_then(|m| m.as_str().parse().ok())
+                .unwrap_or(0);
             return Some((passed, failed, skipped));
         }
     }
-    
+
     None
 }
 

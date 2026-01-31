@@ -1,11 +1,11 @@
 //! Startup time benchmarks
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use std::process::Command;
 
 fn startup_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("startup");
-    
+
     // Benchmark --help startup time
     group.bench_function("help_startup", |b| {
         b.iter(|| {
@@ -16,7 +16,7 @@ fn startup_benchmark(c: &mut Criterion) {
             assert!(output.status.success());
         });
     });
-    
+
     // Benchmark --version startup time
     group.bench_function("version_startup", |b| {
         b.iter(|| {
@@ -27,7 +27,7 @@ fn startup_benchmark(c: &mut Criterion) {
             assert!(output.status.success());
         });
     });
-    
+
     group.finish();
 }
 

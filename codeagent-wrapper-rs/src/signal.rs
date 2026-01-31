@@ -40,14 +40,15 @@ impl Drop for SignalGuard {
 pub fn setup_signal_handler(child_pid: u32) -> SignalGuard {
     // Setup handler only once
     static HANDLER_INSTALLED: AtomicBool = AtomicBool::new(false);
-    
+
     if !HANDLER_INSTALLED.swap(true, Ordering::SeqCst) {
         ctrlc::set_handler(move || {
             info!("Received termination signal");
             SIGNAL_RECEIVED.store(true, Ordering::SeqCst);
-        }).expect("Error setting signal handler");
+        })
+        .expect("Error setting signal handler");
     }
-    
+
     SignalGuard { child_pid }
 }
 
@@ -57,8 +58,8 @@ pub async fn wait_for_graceful_shutdown(
     child: &mut tokio::process::Child,
     timeout_secs: u64,
 ) -> std::io::Result<std::process::ExitStatus> {
-    use tokio::time::{timeout, Duration};
-    
+    use tokio::time::{Duration, timeout};
+
     // First, try graceful shutdown (SIGTERM on Unix)
     #[cfg(unix)]
     if let Some(pid) = child.id() {
@@ -66,10 +67,10 @@ pub async fn wait_for_graceful_shutdown(
             libc::kill(pid as i32, libc::SIGTERM);
         }
     }
-    
+
     #[cfg(not(unix))]
     let _ = child; // suppress unused warning on non-unix
-    
+
     // Wait for process to exit with timeout
     match timeout(Duration::from_secs(timeout_secs), child.wait()).await {
         Ok(result) => result,

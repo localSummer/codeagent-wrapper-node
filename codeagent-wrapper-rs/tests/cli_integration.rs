@@ -35,15 +35,11 @@ fn test_unknown_backend_error() {
 #[test]
 fn test_init_command() {
     let mut cmd = Command::cargo_bin("codeagent").unwrap();
-    cmd.arg("init")
-        .assert()
-        .success();
+    cmd.arg("init").assert().success();
 }
 
 #[test]
 fn test_cleanup_command() {
     let mut cmd = Command::cargo_bin("codeagent").unwrap();
-    cmd.arg("--cleanup")
-        .assert()
-        .success();
+    cmd.arg("--cleanup").assert().success();
 }

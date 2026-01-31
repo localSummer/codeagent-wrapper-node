@@ -1,8 +1,8 @@
 //! Configuration parsing and validation
 
-use std::path::PathBuf;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::cli::Cli;
@@ -42,7 +42,9 @@ pub struct Config {
 impl Config {
     /// Create config from CLI arguments for a new task
     pub fn from_cli(cli: &Cli, task: &str) -> Result<Self> {
-        let work_dir = cli.workdir.as_ref()
+        let work_dir = cli
+            .workdir
+            .as_ref()
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
@@ -64,7 +66,12 @@ impl Config {
     }
 
     /// Create config from CLI arguments for resume mode
-    pub fn from_resume(cli: &Cli, session_id: &str, task: &str, workdir: Option<&str>) -> Result<Self> {
+    pub fn from_resume(
+        cli: &Cli,
+        session_id: &str,
+        task: &str,
+        workdir: Option<&str>,
+    ) -> Result<Self> {
         let work_dir = workdir
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
@@ -158,7 +165,9 @@ fn is_valid_session_id(session_id: &str) -> bool {
     // Session ID should be alphanumeric with optional hyphens/underscores
     !session_id.is_empty()
         && session_id.len() <= 128
-        && session_id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        && session_id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
 
 /// Get default max parallel workers based on CPU count

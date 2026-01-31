@@ -91,7 +91,7 @@ pub enum Command {
         /// Working directory
         workdir: Option<String>,
     },
-    
+
     /// Install codeagent skill to ~/.claude/skills/
     Init {
         /// Force overwrite existing installation
@@ -134,19 +134,17 @@ mod tests {
 
     #[test]
     fn test_cli_with_backend() {
-        let cli = Cli::try_parse_from([
-            "codeagent", "--backend", "claude", "Test task"
-        ]).unwrap();
+        let cli = Cli::try_parse_from(["codeagent", "--backend", "claude", "Test task"]).unwrap();
         assert_eq!(cli.backend, Some("claude".to_string()));
     }
 
     #[test]
     fn test_cli_resume() {
-        let cli = Cli::try_parse_from([
-            "codeagent", "resume", "abc123", "Continue"
-        ]).unwrap();
+        let cli = Cli::try_parse_from(["codeagent", "resume", "abc123", "Continue"]).unwrap();
         match cli.command {
-            Some(Command::Resume { session_id, task, .. }) => {
+            Some(Command::Resume {
+                session_id, task, ..
+            }) => {
                 assert_eq!(session_id, "abc123");
                 assert_eq!(task, "Continue");
             }

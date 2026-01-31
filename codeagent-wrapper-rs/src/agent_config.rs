@@ -1,9 +1,9 @@
 //! Agent configuration and preset loading
 
-use std::collections::HashMap;
-use std::path::PathBuf;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// Agent configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -58,19 +58,20 @@ fn get_config_dir() -> PathBuf {
 pub async fn get_agent_config(name: &str) -> Result<AgentConfig> {
     let config_dir = get_config_dir();
     let agents_file = config_dir.join("agents.yaml");
-    
+
     if !agents_file.exists() {
         return Err(anyhow::anyhow!("Agent config not found: {}", name));
     }
-    
+
     let content = tokio::fs::read_to_string(&agents_file)
         .await
         .with_context(|| format!("Failed to read agents config: {}", agents_file.display()))?;
-    
-    let agents: HashMap<String, AgentConfig> = serde_yaml::from_str(&content)
-        .with_context(|| "Failed to parse agents.yaml")?;
-    
-    agents.get(name)
+
+    let agents: HashMap<String, AgentConfig> =
+        serde_yaml::from_str(&content).with_context(|| "Failed to parse agents.yaml")?;
+
+    agents
+        .get(name)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("Agent not found: {}", name))
 }
@@ -79,18 +80,18 @@ pub async fn get_agent_config(name: &str) -> Result<AgentConfig> {
 pub async fn load_models_config() -> Result<ModelsConfig> {
     let config_dir = get_config_dir();
     let models_file = config_dir.join("models.yaml");
-    
+
     if !models_file.exists() {
         return Ok(ModelsConfig::default());
     }
-    
+
     let content = tokio::fs::read_to_string(&models_file)
         .await
         .with_context(|| format!("Failed to read models config: {}", models_file.display()))?;
-    
-    let config: ModelsConfig = serde_yaml::from_str(&content)
-        .with_context(|| "Failed to parse models.yaml")?;
-    
+
+    let config: ModelsConfig =
+        serde_yaml::from_str(&content).with_context(|| "Failed to parse models.yaml")?;
+
     Ok(config)
 }
 
@@ -133,16 +134,12 @@ env:
             backend: Some("claude".to_string()),
             ..Default::default()
         };
-        
+
         // CLI overrides agent config
-        let (model, backend) = merge_agent_config(
-            Some("cli-model".to_string()),
-            None,
-            &agent,
-        );
+        let (model, backend) = merge_agent_config(Some("cli-model".to_string()), None, &agent);
         assert_eq!(model, Some("cli-model".to_string()));
         assert_eq!(backend, Some("claude".to_string()));
-        
+
         // Agent config used when CLI doesn't specify
         let (model, backend) = merge_agent_config(None, None, &agent);
         assert_eq!(model, Some("default-model".to_string()));
