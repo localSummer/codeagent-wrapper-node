@@ -1,6 +1,8 @@
 //! Agent configuration and preset loading
+//!
+//! These types and functions are reserved public API for future use.
 
-#![allow(dead_code)]
+#![allow(dead_code)] // Reserved API: agent preset loading will be used when config file support is added
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};

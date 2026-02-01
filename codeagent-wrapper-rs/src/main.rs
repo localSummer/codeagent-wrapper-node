@@ -2,9 +2,6 @@
 //!
 //! This is the main entry point for the codeagent CLI tool.
 
-// Allow all clippy warnings and dead_code for now - will be addressed in future refactoring
-#![allow(clippy::all, dead_code, unused_variables, unused_imports)]
-
 mod agent_config;
 mod backend;
 mod cli;

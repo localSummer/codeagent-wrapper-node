@@ -1,7 +1,5 @@
 //! Task executor for running backend commands
 
-#![allow(dead_code)]
-
 use anyhow::{Context, Result};
 use std::process::Stdio;
 use std::sync::Arc;
@@ -32,6 +30,7 @@ pub struct TaskResult {
     /// Parsed events
     pub events: Vec<serde_json::Value>,
     /// Stderr output
+    #[allow(dead_code)] // Reserved: stderr will be used for error reporting
     pub stderr: String,
     /// Files changed count
     pub files_changed: Option<usize>,
@@ -43,6 +42,7 @@ pub struct TaskResult {
 pub struct TaskExecutor {
     backend: Arc<dyn Backend>,
     config: Config,
+    #[allow(dead_code)] // Reserved: task-specific logging will be enabled later
     logger: Logger,
 }
 
@@ -227,12 +227,11 @@ pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec
         }
 
         // Wait for a task to complete
-        if running > 0 {
-            if let Some((task_id, result)) = rx.recv().await {
+        if running > 0
+            && let Some((task_id, result)) = rx.recv().await {
                 results.insert(task_id, result);
                 running -= 1;
             }
-        }
     }
 
     // Return results in original order

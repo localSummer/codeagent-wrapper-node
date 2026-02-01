@@ -1,6 +1,9 @@
 //! Error types for codeagent-wrapper
+//!
+//! Error types are defined for all possible error conditions to maintain
+//! compatibility with the Node.js version and support future error handling.
 
-#![allow(dead_code)]
+#![allow(dead_code)] // Reserved API: comprehensive error types for future use
 
 use thiserror::Error;
 

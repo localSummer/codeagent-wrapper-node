@@ -1,6 +1,8 @@
 //! Utility functions
+//!
+//! These utilities are reserved for progress display and path handling.
 
-#![allow(dead_code)]
+#![allow(dead_code)] // Reserved API: progress formatting and path utilities for enhanced UX
 
 use anyhow::Result;
 use serde_json::{Value, json};

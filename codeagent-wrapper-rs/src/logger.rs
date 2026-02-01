@@ -85,21 +85,17 @@ pub async fn cleanup_old_logs() -> Result<()> {
     let mut entries = fs::read_dir(&log_dir).await?;
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "log") {
-            if let Ok(metadata) = entry.metadata().await {
-                if let Ok(modified) = metadata.modified() {
-                    if let Ok(age) = now.duration_since(modified) {
-                        if age > max_age {
+        if path.extension().is_some_and(|ext| ext == "log")
+            && let Ok(metadata) = entry.metadata().await
+                && let Ok(modified) = metadata.modified()
+                    && let Ok(age) = now.duration_since(modified)
+                        && age > max_age {
                             let size = metadata.len();
                             if fs::remove_file(&path).await.is_ok() {
                                 deleted_count += 1;
                                 deleted_size += size;
                             }
                         }
-                    }
-                }
-            }
-        }
     }
 
     println!(
@@ -114,6 +110,7 @@ pub async fn cleanup_old_logs() -> Result<()> {
 /// Logger struct for task-specific logging
 #[derive(Clone)]
 pub struct Logger {
+    #[allow(dead_code)] // Reserved: task_id will be used for task-specific log formatting
     task_id: Option<String>,
 }
 
@@ -124,6 +121,7 @@ impl Logger {
     }
 
     /// Log info message
+    #[allow(dead_code)] // Reserved: will be used when task-specific logging is enabled
     pub fn info(&self, message: &str) {
         if let Some(ref id) = self.task_id {
             tracing::info!(task_id = %id, "{}", message);
@@ -133,6 +131,7 @@ impl Logger {
     }
 
     /// Log debug message
+    #[allow(dead_code)] // Reserved: will be used when task-specific logging is enabled
     pub fn debug(&self, message: &str) {
         if let Some(ref id) = self.task_id {
             tracing::debug!(task_id = %id, "{}", message);
@@ -142,6 +141,7 @@ impl Logger {
     }
 
     /// Log error message
+    #[allow(dead_code)] // Reserved: will be used when task-specific logging is enabled
     pub fn error(&self, message: &str) {
         if let Some(ref id) = self.task_id {
             tracing::error!(task_id = %id, "{}", message);
@@ -151,6 +151,7 @@ impl Logger {
     }
 
     /// Log warning message
+    #[allow(dead_code)] // Reserved: will be used when task-specific logging is enabled
     pub fn warn(&self, message: &str) {
         if let Some(ref id) = self.task_id {
             tracing::warn!(task_id = %id, "{}", message);

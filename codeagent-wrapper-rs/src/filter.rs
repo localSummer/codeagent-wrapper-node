@@ -1,6 +1,8 @@
 //! Output filtering utilities
+//!
+//! These utilities are reserved for output processing and metrics extraction.
 
-#![allow(dead_code)]
+#![allow(dead_code)] // Reserved API: output filtering will be used when metrics reporting is added
 
 use regex::Regex;
 
@@ -41,9 +43,7 @@ impl Default for OutputFilter {
 /// Sanitize output for JSON embedding
 pub fn sanitize_for_json(input: &str) -> String {
     input
-        .replace('\x00', "")
-        .replace('\x08', "")
-        .replace('\x0c', "")
+        .replace(['\x00', '\x08', '\x0c'], "")
 }
 
 /// Extract test coverage from output
@@ -56,15 +56,12 @@ pub fn extract_coverage(output: &str) -> Option<f64> {
     ];
 
     for pattern in patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            if let Some(caps) = re.captures(output) {
-                if let Some(m) = caps.get(1) {
-                    if let Ok(val) = m.as_str().parse::<f64>() {
+        if let Ok(re) = Regex::new(pattern)
+            && let Some(caps) = re.captures(output)
+                && let Some(m) = caps.get(1)
+                    && let Ok(val) = m.as_str().parse::<f64>() {
                         return Some(val);
                     }
-                }
-            }
-        }
     }
 
     None
@@ -79,15 +76,12 @@ pub fn extract_files_changed(output: &str) -> Option<usize> {
     ];
 
     for pattern in patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            if let Some(caps) = re.captures(output) {
-                if let Some(m) = caps.get(1) {
-                    if let Ok(val) = m.as_str().parse::<usize>() {
+        if let Ok(re) = Regex::new(pattern)
+            && let Some(caps) = re.captures(output)
+                && let Some(m) = caps.get(1)
+                    && let Ok(val) = m.as_str().parse::<usize>() {
                         return Some(val);
                     }
-                }
-            }
-        }
     }
 
     None
@@ -96,8 +90,8 @@ pub fn extract_files_changed(output: &str) -> Option<usize> {
 /// Extract test results from output
 pub fn extract_test_results(output: &str) -> Option<(usize, usize, usize)> {
     // Pattern: X passed, Y failed, Z skipped
-    if let Ok(re) = Regex::new(r"(\d+)\s*passed.*?(\d+)\s*failed.*?(\d+)\s*skipped") {
-        if let Some(caps) = re.captures(output) {
+    if let Ok(re) = Regex::new(r"(\d+)\s*passed.*?(\d+)\s*failed.*?(\d+)\s*skipped")
+        && let Some(caps) = re.captures(output) {
             let passed = caps
                 .get(1)
                 .and_then(|m| m.as_str().parse().ok())
@@ -112,7 +106,6 @@ pub fn extract_test_results(output: &str) -> Option<(usize, usize, usize)> {
                 .unwrap_or(0);
             return Some((passed, failed, skipped));
         }
-    }
 
     None
 }

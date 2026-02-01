@@ -1,6 +1,8 @@
 //! JSON stream parser for backend output
+//!
+//! Backend type detection and progress parsing are reserved for future output processing.
 
-#![allow(dead_code)]
+#![allow(dead_code)] // Reserved API: backend type detection for enhanced output processing
 
 use tokio::io::{AsyncBufRead, AsyncBufReadExt};
 use tracing::trace;
@@ -106,7 +108,7 @@ pub fn detect_backend_type(value: &serde_json::Value) -> BackendType {
     }
 
     // Opencode format: has "message" object
-    if value.get("message").map_or(false, |m| m.is_object()) {
+    if value.get("message").is_some_and(|m| m.is_object()) {
         return BackendType::Opencode;
     }
 

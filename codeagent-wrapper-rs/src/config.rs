@@ -177,7 +177,7 @@ pub fn get_default_max_parallel_workers() -> usize {
         .map(|p| p.get())
         .unwrap_or(1);
     let adaptive = cpu_count * 4;
-    adaptive.min(100).max(1)
+    adaptive.clamp(1, 100)
 }
 
 #[cfg(test)]
