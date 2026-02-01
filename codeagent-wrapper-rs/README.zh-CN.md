@@ -22,24 +22,24 @@
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-apple-darwin -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-apple-darwin -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 
 # macOS (Intel)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-apple-darwin -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-apple-darwin -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 
 # Linux (x86_64)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-unknown-linux-gnu -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-unknown-linux-gnu -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 
 # Linux (ARM64)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-unknown-linux-gnu -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-unknown-linux-gnu -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 ```
 
 ### Homebrew (macOS/Linux)
@@ -68,51 +68,51 @@ cargo install codeagent-wrapper
 
 ```bash
 # 使用自动检测的后端运行任务
-codeagent "修复 main.rs 中的 bug"
+codeagent-wrapper "修复 main.rs 中的 bug"
 
 # 指定后端
-codeagent --backend claude "实现功能 X"
+codeagent-wrapper --backend claude "实现功能 X"
 
 # 指定模型
-codeagent --backend codex --model gpt-4 "优化这个函数"
+codeagent-wrapper --backend codex --model gpt-4 "优化这个函数"
 ```
 
 ### 恢复会话
 
 ```bash
-codeagent resume abc123 "继续实现"
+codeagent-wrapper resume abc123 "继续实现"
 ```
 
 ### 并行执行
 
 ```bash
-cat tasks.txt | codeagent --parallel
+cat tasks.txt | codeagent-wrapper --parallel
 ```
 
 ### 安装 skill
 
 ```bash
-codeagent init
+codeagent-wrapper init
 ```
 
 ### 清理旧日志
 
 ```bash
-codeagent --cleanup
+codeagent-wrapper --cleanup
 ```
 
 ## 配置
 
 ### 环境变量
 
-| 变量                         | 描述           |
-| ---------------------------- | -------------- |
-| `CODEAGENT_BACKEND`          | 默认后端       |
-| `CODEAGENT_MODEL`            | 默认模型       |
+| 变量                         | 描述               |
+| ---------------------------- | ------------------ |
+| `CODEAGENT_BACKEND`          | 默认后端           |
+| `CODEAGENT_MODEL`            | 默认模型           |
 | `CODEX_TIMEOUT`              | 任务超时时间（秒） |
-| `CODEAGENT_SKIP_PERMISSIONS` | 跳过权限检查   |
-| `CODEAGENT_QUIET`            | 抑制进度输出   |
-| `CODEAGENT_DEBUG`            | 启用调试日志   |
+| `CODEAGENT_SKIP_PERMISSIONS` | 跳过权限检查       |
+| `CODEAGENT_QUIET`            | 抑制进度输出       |
+| `CODEAGENT_DEBUG`            | 启用调试日志       |
 
 ### 配置文件
 
@@ -123,13 +123,13 @@ codeagent --cleanup
 
 测试环境：Apple M1 Pro, macOS 14.0
 
-| 指标                 | Node.js   | Rust          | 提升           |
-| -------------------- | --------- | ------------- | -------------- |
-| 冷启动               | ~80ms     | **6ms**       | **快 13 倍**   |
+| 指标                | Node.js   | Rust          | 提升           |
+| ------------------- | --------- | ------------- | -------------- |
+| 冷启动              | ~80ms     | **6ms**       | **快 13 倍**   |
 | JSON 解析 (1K 事件) | ~23ms     | **1.03ms**    | **快 22 倍**   |
-| JSON 吞吐量          | ~10 MiB/s | **100 MiB/s** | **快 10 倍**   |
-| 内存占用             | ~35MB     | **~3MB**      | **降低 12 倍** |
-| 二进制大小           | N/A       | **2.1MB**     | 单文件         |
+| JSON 吞吐量         | ~10 MiB/s | **100 MiB/s** | **快 10 倍**   |
+| 内存占用            | ~35MB     | **~3MB**      | **降低 12 倍** |
+| 二进制大小          | N/A       | **2.1MB**     | 单文件         |
 
 ### 基准测试详情
 
@@ -150,7 +150,7 @@ Rust 版本可以直接替换 Node.js 版本：
 npx codeagent-wrapper "你的任务"
 
 # 之后 (Rust)
-codeagent "你的任务"
+codeagent-wrapper "你的任务"
 ```
 
 ### 兼容性

@@ -22,24 +22,24 @@ Download the latest release for your platform:
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-apple-darwin -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-apple-darwin -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 
 # macOS (Intel)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-apple-darwin -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-apple-darwin -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 
 # Linux (x86_64)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-unknown-linux-gnu -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-unknown-linux-gnu -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 
 # Linux (ARM64)
-curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-unknown-linux-gnu -o codeagent
-chmod +x codeagent
-sudo mv codeagent /usr/local/bin/
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-unknown-linux-gnu -o codeagent-wrapper
+chmod +x codeagent-wrapper
+sudo mv codeagent-wrapper /usr/local/bin/
 ```
 
 ### Homebrew (macOS/Linux)
@@ -68,37 +68,37 @@ cargo install codeagent-wrapper
 
 ```bash
 # Run a task with auto-detected backend
-codeagent "Fix the bug in main.rs"
+codeagent-wrapper "Fix the bug in main.rs"
 
 # Specify a backend
-codeagent --backend claude "Implement feature X"
+codeagent-wrapper --backend claude "Implement feature X"
 
 # Specify a model
-codeagent --backend codex --model gpt-4 "Optimize this function"
+codeagent-wrapper --backend codex --model gpt-4 "Optimize this function"
 ```
 
 ### Resume a session
 
 ```bash
-codeagent resume abc123 "Continue the implementation"
+codeagent-wrapper resume abc123 "Continue the implementation"
 ```
 
 ### Parallel execution
 
 ```bash
-cat tasks.txt | codeagent --parallel
+cat tasks.txt | codeagent-wrapper --parallel
 ```
 
 ### Install skill
 
 ```bash
-codeagent init
+codeagent-wrapper init
 ```
 
 ### Cleanup old logs
 
 ```bash
-codeagent --cleanup
+codeagent-wrapper --cleanup
 ```
 
 ## Configuration
@@ -150,7 +150,7 @@ The Rust version is a drop-in replacement for the Node.js version:
 npx codeagent-wrapper "Your task"
 
 # After (Rust)
-codeagent "Your task"
+codeagent-wrapper "Your task"
 ```
 
 ### Compatibility
