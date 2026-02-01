@@ -63,7 +63,11 @@ impl TaskExecutor {
         // Build command arguments
         let task_content = self.get_target()?;
         let use_stdin = should_use_stdin(&task_content);
-        let target = if use_stdin { "-".to_string() } else { task_content.clone() };
+        let target = if use_stdin {
+            "-".to_string()
+        } else {
+            task_content.clone()
+        };
         let args = self.backend.build_args(&self.config, &target);
 
         info!(
@@ -185,7 +189,9 @@ fn should_use_stdin(task: &str) -> bool {
     }
 
     // Use stdin for tasks with special characters
-    let special_chars = ['\'', '"', '`', '$', '\\', '\n', '\r', '|', '&', ';', '<', '>'];
+    let special_chars = [
+        '\'', '"', '`', '$', '\\', '\n', '\r', '|', '&', ';', '<', '>',
+    ];
     task.chars().any(|c| special_chars.contains(&c))
 }
 
