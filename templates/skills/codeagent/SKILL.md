@@ -18,6 +18,7 @@ Execute codeagent-wrapper commands with pluggable AI backends (Codex, Claude, Ge
 ## Usage
 
 **HEREDOC syntax** (recommended):
+
 ```bash
 codeagent-wrapper --backend codex - [working_dir] <<'__CODEAGENT_EOF__'
 <task content here>
@@ -25,6 +26,7 @@ __CODEAGENT_EOF__
 ```
 
 **With backend selection**:
+
 ```bash
 codeagent-wrapper --backend claude - . <<'__CODEAGENT_EOF__'
 <task content here>
@@ -32,6 +34,7 @@ __CODEAGENT_EOF__
 ```
 
 **Simple tasks**:
+
 ```bash
 codeagent-wrapper --backend codex "simple task" [working_dir]
 codeagent-wrapper --backend gemini "simple task" [working_dir]
@@ -64,38 +67,43 @@ __CODEAGENT_EOF__
 
 ## Backends
 
-| Backend | Command | Parameters | Description | Best For |
-|---------|---------|------------|-------------|----------|
-| codex | `--backend codex` | `--full-auto` | OpenAI Codex (default) | Code analysis, complex development |
-| claude | `--backend claude` | `--dangerously-skip-permissions` | Anthropic Claude | Simple tasks, documentation, prompts |
-| gemini | `--backend gemini` | `-y` | Google Gemini | UI/UX prototyping |
-| opencode | `--backend opencode` | - | Opencode (MiniMax-M2.1) | Code exploration |
+| Backend  | Command              | Parameters                       | Description             | Best For                             |
+| -------- | -------------------- | -------------------------------- | ----------------------- | ------------------------------------ |
+| codex    | `--backend codex`    | `--full-auto`                    | OpenAI Codex (default)  | Code analysis, complex development   |
+| claude   | `--backend claude`   | `--dangerously-skip-permissions` | Anthropic Claude        | Simple tasks, documentation, prompts |
+| gemini   | `--backend gemini`   | `-y`                             | Google Gemini           | UI/UX prototyping                    |
+| opencode | `--backend opencode` | -                                | Opencode (MiniMax-M2.1) | Code exploration                     |
 
 ### Backend Selection Guide
 
 **Codex** (default):
+
 - Deep code understanding and complex logic implementation
 - Large-scale refactoring with precise dependency tracking
 - Algorithm optimization and performance tuning
 - Example: "Analyze the call graph of @src/core and refactor the module dependency structure"
 
 **Claude**:
+
 - Quick feature implementation with clear requirements
 - Technical documentation, API specs, README generation
 - Professional prompt engineering (e.g., product requirements, design specs)
 - Example: "Generate a comprehensive README for @package.json with installation, usage, and API docs"
 
 **Gemini**:
+
 - UI component scaffolding and layout prototyping
 - Design system implementation with style consistency
 - Interactive element generation with accessibility support
 - Example: "Create a responsive dashboard layout with sidebar navigation and data visualization cards"
 
 **Backend Switching**:
+
 - Start with Codex for analysis, switch to Claude for documentation, then Gemini for UI implementation
 - Use per-task backend selection in parallel mode to optimize for each task's strengths
 
 **Opencode**:
+
 - Quick code exploration and navigation
 - MiniMax-M2.1 powered chat for understanding existing codebases (default model: minimax/MiniMax-M2.1)
 - Example: "Explore the architecture of this project and identify key modules"
@@ -134,6 +142,7 @@ __CODEAGENT_EOF__
 ## Parallel Execution
 
 **Default (summary mode - context-efficient):**
+
 ```bash
 codeagent-wrapper --parallel <<'__CODEAGENT_EOF__'
 ---TASK---
@@ -151,6 +160,7 @@ __CODEAGENT_EOF__
 ```
 
 **Full output mode (for debugging):**
+
 ```bash
 codeagent-wrapper --parallel --full-output <<'__CODEAGENT_EOF__'
 ...
@@ -158,10 +168,12 @@ __CODEAGENT_EOF__
 ```
 
 **Output Modes:**
+
 - **Summary (default)**: Structured report with changes, output, verification, and review summary.
 - **Full (`--full-output`)**: Complete task messages. Use only when debugging specific failures.
 
 **With per-task backend**:
+
 ```bash
 codeagent-wrapper --parallel <<'__CODEAGENT_EOF__'
 ---TASK---
@@ -195,11 +207,12 @@ Set `CODEAGENT_MAX_PARALLEL_WORKERS` to limit concurrent tasks (default: unlimit
   - For **Claude** backend: Adds `--dangerously-skip-permissions` (default: disabled)
   - For **Codex** backend: Adds `--full-auto` (default: disabled)
   - For **Gemini/Opencode** backends: No effect
-- `CODEAGENT_MAX_PARALLEL_WORKERS`: Limit concurrent tasks in parallel mode (default: min(100, cpuCount*4), recommended: 8)
+- `CODEAGENT_MAX_PARALLEL_WORKERS`: Limit concurrent tasks in parallel mode (default: min(100, cpuCount\*4), recommended: 8)
 
 ## Invocation Pattern
 
 **Single Task**:
+
 ```
 Bash tool parameters:
 - command: codeagent-wrapper --backend <backend> - [working_dir] <<'__CODEAGENT_EOF__'
@@ -212,6 +225,7 @@ Note: --backend is optional (default: codex). Add it for non-default backend.
 ```
 
 **Parallel Tasks**:
+
 ```
 Bash tool parameters:
 - command: codeagent-wrapper --parallel <<'__CODEAGENT_EOF__'
@@ -234,6 +248,7 @@ Note: Per-task backend is optional, defaults to codex. Global --backend can be s
 **NEVER kill codeagent processes.** Long-running tasks are normal. Instead:
 
 1. **Check task status via log file**:
+
    ```bash
    # View real-time output
    tail -f /tmp/claude/<workdir>/tasks/<task_id>.output
@@ -243,6 +258,7 @@ Note: Per-task backend is optional, defaults to codex. Global --backend can be s
    ```
 
 2. **Wait with timeout**:
+
    ```bash
    # Use TaskOutput tool with block=true and timeout
    TaskOutput(task_id="<id>", block=true, timeout=300000)
@@ -268,4 +284,4 @@ Note: Per-task backend is optional, defaults to codex. Global --backend can be s
 
 - Multi-backend support for all modes (workdir, resume, parallel): Codex, Claude, Gemini, Opencode
 - Security controls with configurable permission checks (`--skip-permissions` / `--yolo`)
-- Concurrency limits with adaptive worker pool (min(100, cpuCount*4))
+- Concurrency limits with adaptive worker pool (min(100, cpuCount\*4))
