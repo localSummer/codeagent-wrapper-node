@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-02-02
+
+### Improved
+
+- **CLI --help Examples**: Enhanced help text coverage
+  - Added stdin HEREDOC usage example (most important missing item)
+  - Added workdir positional argument example
+  - Improved feature coverage from 42.9% to 71.4%
+  - Aligned help text with SKILL.md documentation
+
+## [1.0.3] - 2026-02-01
+
+### Improved
+
+- **SKILL.md documentation**: Enhanced usage documentation
+  - Added Quick Reference section for CLI usage patterns
+  - Added important warning about stdin (-) mode + workdir restriction
+  - Improved HEREDOC usage examples with two recommended approaches
+  - Fixed table format alignment
+  - Added blank lines before code blocks for readability
+
+## [1.0.2] - 2026-02-01
+
+### Fixed
+
+- **stdin input handling**: Critical bug fix for task input processing
+  - Fixed issue where only long tasks (>4096 bytes) were written to stdin
+  - Added intelligent stdin detection logic (length + special character check)
+  - Added stdin support for `resume` command
+- **Code formatting**: Fixed cargo fmt issues after clippy --fix
+  - Fixed if-else expression formatting
+  - Fixed long array formatting
+
 ## [1.0.1] - 2026-02-01
 
 ### Fixed
