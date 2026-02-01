@@ -113,6 +113,57 @@
           "resolved": false
         }
       ]
+    },
+    {
+      "type": "correction",
+      "category": "code",
+      "title": "clippy --fix 后需要运行 cargo fmt 修复格式",
+      "content": "在执行 cargo clippy --fix 后，let-chains 的格式可能不符合 rustfmt 标准，导致 CI Check formatting 失败。需要运行 cargo fmt 修复格式问题。这是 clippy 自动修复的已知行为。",
+      "source_chunk": "**User:** Check formatting 报错 println!( Error: Process completed with exit code 1.\n**Assistant:** 格式检查失败了，需要运行 cargo fmt 自动格式化代码。修复了 executor.rs、filter.rs、logger.rs 中的 let-chains 格式问题。",
+      "confidence_score": 90,
+      "related_entities": [
+        {
+          "type": "command",
+          "raw": "cargo fmt",
+          "slug": null,
+          "resolved": false
+        }
+      ],
+      "tools_mentioned": ["cargo", "clippy", "rustfmt"]
+    },
+    {
+      "type": "workflow_note",
+      "category": "workflow",
+      "title": "Rust 代码质量修复的完整 checklist",
+      "content": "完整的 Rust 代码质量修复流程应包括：1) cargo clippy --fix 2) 手动修复剩余警告 3) cargo fmt 格式化 4) cargo clippy -- -D warnings 验证 5) cargo test 测试 6) cargo build --release 构建 7) git commit 8) git tag 9) git push --tags。缺少 cargo fmt 会导致 CI 失败。",
+      "source_chunk": "**Assistant:** ✅ cargo clippy -- -D warnings：无警告 ✅ cargo test：33 个测试全部通过 ✅ cargo build --release：发布构建成功\n**User:** commit and push and push new tag\n**Assistant:** 提交并推送 v1.0.1-rust\n**User:** Check formatting 报错",
+      "confidence_score": 85,
+      "related_entities": [
+        {
+          "type": "project",
+          "raw": "codeagent-wrapper-rs",
+          "slug": "codeagent-wrapper-rs",
+          "resolved": true
+        }
+      ],
+      "tools_mentioned": ["cargo", "git"]
+    },
+    {
+      "type": "correction",
+      "category": "workflow",
+      "title": "Git tag 必须指向最终的 commit 才能触发 CI release",
+      "content": "如果在打 tag 后又有新的 commit，需要删除旧 tag 并重新在最新 commit 上打 tag。原因：v1.0.1-rust tag 指向了代码质量修复的 commit（98423b1），但后续又有格式化修复的 commit（8083e52），导致 GitHub Actions 的 Create Release 工作流被跳过。解决方法：git tag -d v1.0.1-rust && git push origin :refs/tags/v1.0.1-rust 删除旧 tag，然后在最新 commit 上重新打 tag 并推送。",
+      "source_chunk": "**User:** 分析发布为什么跳过了，我推送了新的 v1.0.1-rust 的tag，Rust CI/CD / Create Release (push) Skipped\n**Assistant:** 发现问题了！v1.0.1-rust tag 指向的是提交 98423b1，但现在 HEAD 已经移动到了 8083e52（cargo fmt 的提交）。需要删除旧 tag，重新在最新的 commit 上打 tag。",
+      "confidence_score": 95,
+      "related_entities": [
+        {
+          "type": "command",
+          "raw": "git tag",
+          "slug": null,
+          "resolved": false
+        }
+      ],
+      "tools_mentioned": ["git", "github-actions"]
     }
   ],
   "suggestions": []

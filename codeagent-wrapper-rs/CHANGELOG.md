@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2024-12-XX
+## [1.0.1] - 2026-02-01
+
+### Fixed
+
+- **Code quality**: Removed global `#![allow(clippy::all)]` directive and fixed all warnings
+- **Clippy warnings**: Fixed 18 clippy warnings (15 automatic + 3 manual)
+  - Replaced `min().max()` with `clamp()` for better readability
+  - Simplified nested if-let chains using let-chains syntax
+  - Consolidated consecutive `str::replace()` calls
+- **Code formatting**: Applied `rustfmt` to ensure consistent formatting
+
+### Changed
+
+- **Reserved APIs**: Added documented `#![allow(dead_code)]` attributes for reserved public APIs
+  - Preserved compatibility interfaces for future features
+  - Each allow directive includes a comment explaining the rationale
+- **CI compliance**: All builds now pass with `-D warnings` flag (zero warnings policy)
+
+## [1.0.0] - 2026-02-01
 
 ### Added
 
