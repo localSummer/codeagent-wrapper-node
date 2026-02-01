@@ -12,13 +12,13 @@ Comprehensive performance comparison between Node.js and Rust implementations.
 
 ## Summary
 
-| Metric | Node.js | Rust | Improvement |
-|--------|---------|------|-------------|
-| Cold Start | 80ms | 6ms | **13x faster** |
-| JSON Parsing (1K) | 23ms | 1.03ms | **22x faster** |
-| JSON Throughput | ~10 MiB/s | 100 MiB/s | **10x faster** |
-| Memory (idle) | 35MB | 3MB | **12x less** |
-| Binary Size | N/A | 2.1MB | Single file |
+| Metric            | Node.js   | Rust      | Improvement    |
+| ----------------- | --------- | --------- | -------------- |
+| Cold Start        | 80ms      | 6ms       | **13x faster** |
+| JSON Parsing (1K) | 23ms      | 1.03ms    | **22x faster** |
+| JSON Throughput   | ~10 MiB/s | 100 MiB/s | **10x faster** |
+| Memory (idle)     | 35MB      | 3MB       | **12x less**   |
+| Binary Size       | N/A       | 2.1MB     | Single file    |
 
 ## Detailed Benchmarks
 
@@ -108,22 +108,22 @@ opt-level = 3           # Maximum optimization
 Throughput comparison for parallel task execution:
 
 | Tasks | Node.js | Rust | Speedup |
-|-------|---------|------|---------|
-| 5 | 2.1s | 0.3s | 7x |
-| 10 | 4.8s | 0.7s | 6.9x |
-| 20 | 10.2s | 1.4s | 7.3x |
+| ----- | ------- | ---- | ------- |
+| 5     | 2.1s    | 0.3s | 7x      |
+| 10    | 4.8s    | 0.7s | 6.9x    |
+| 20    | 10.2s   | 1.4s | 7.3x    |
 
-*Note: Actual backend execution time not included*
+_Note: Actual backend execution time not included_
 
 ### Large File Processing
 
 Processing a 10MB JSON stream:
 
-| Metric | Node.js | Rust |
-|--------|---------|------|
-| Parse Time | 980ms | 98ms |
-| Peak Memory | 145MB | 12MB |
-| CPU Usage | 95% | 45% |
+| Metric      | Node.js | Rust |
+| ----------- | ------- | ---- |
+| Parse Time  | 980ms   | 98ms |
+| Peak Memory | 145MB   | 12MB |
+| CPU Usage   | 95%     | 45%  |
 
 ## Recommendations
 
@@ -144,7 +144,7 @@ Processing a 10MB JSON stream:
 
 ```bash
 # Clone and build
-git clone https://github.com/user/codeagent-wrapper
+git clone https://github.com/localSummer/codeagent-wrapper-node.git
 cd codeagent-wrapper-rs
 cargo build --release
 
