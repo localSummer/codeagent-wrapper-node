@@ -61,7 +61,9 @@ impl TaskExecutor {
         let start = Instant::now();
 
         // Build command arguments
-        let target = self.get_target()?;
+        let task_content = self.get_target()?;
+        let use_stdin = should_use_stdin(&task_content);
+        let target = if use_stdin { "-".to_string() } else { task_content.clone() };
         let args = self.backend.build_args(&self.config, &target);
 
         info!(
@@ -86,8 +88,8 @@ impl TaskExecutor {
 
         // Write to stdin if using stdin mode
         if let Some(mut stdin) = child.stdin.take() {
-            if self.config.task.len() > 4096 {
-                stdin.write_all(self.config.task.as_bytes()).await?;
+            if use_stdin {
+                stdin.write_all(task_content.as_bytes()).await?;
             }
             drop(stdin);
         }
@@ -170,6 +172,21 @@ impl TaskExecutor {
             Ok(self.config.task.clone())
         }
     }
+}
+
+/// Determine if task should use stdin for input
+/// Use stdin for long tasks or tasks with special characters that may cause shell issues
+fn should_use_stdin(task: &str) -> bool {
+    const STDIN_THRESHOLD: usize = 800;
+
+    // Use stdin for long tasks
+    if task.len() > STDIN_THRESHOLD {
+        return true;
+    }
+
+    // Use stdin for tasks with special characters
+    let special_chars = ['\'', '"', '`', '$', '\\', '\n', '\r', '|', '&', ';', '<', '>'];
+    task.chars().any(|c| special_chars.contains(&c))
 }
 
 /// Run tasks in parallel

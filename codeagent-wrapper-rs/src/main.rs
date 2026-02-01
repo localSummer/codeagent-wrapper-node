@@ -17,6 +17,7 @@ mod utils;
 
 use anyhow::Result;
 use clap::Parser;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tracing::info;
 
 use crate::backend::select_backend;
@@ -49,7 +50,13 @@ async fn main() -> Result<()> {
             task,
             workdir,
         }) => {
-            let config = Config::from_resume(&cli, session_id, task, workdir.as_deref())?;
+            // Handle "-" as stdin marker for resume mode
+            let actual_task = if task == "-" {
+                read_stdin_task().await?
+            } else {
+                task.clone()
+            };
+            let config = Config::from_resume(&cli, session_id, &actual_task, workdir.as_deref())?;
             run_task(config).await?;
         }
         None => {
@@ -62,7 +69,13 @@ async fn main() -> Result<()> {
             if cli.parallel {
                 run_parallel(&cli).await?;
             } else if let Some(ref task) = cli.task {
-                let config = Config::from_cli(&cli, task)?;
+                // Handle "-" as stdin marker
+                let actual_task = if task == "-" {
+                    read_stdin_task().await?
+                } else {
+                    task.clone()
+                };
+                let config = Config::from_cli(&cli, &actual_task)?;
                 run_task(config).await?;
             } else {
                 // Print help if no task provided
@@ -111,4 +124,23 @@ async fn run_parallel(cli: &Cli) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Read task content from stdin
+async fn read_stdin_task() -> Result<String> {
+    let stdin = tokio::io::stdin();
+    let reader = BufReader::new(stdin);
+    let mut lines = reader.lines();
+    let mut content = Vec::new();
+
+    while let Some(line) = lines.next_line().await? {
+        content.push(line);
+    }
+
+    let task = content.join("\n");
+    if task.trim().is_empty() {
+        anyhow::bail!("No task provided via stdin");
+    }
+
+    Ok(task)
 }
