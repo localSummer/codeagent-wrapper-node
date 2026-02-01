@@ -8,7 +8,10 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(author, version, about, long_about = None)]
 #[command(after_help = r#"Examples:
   codeagent "Fix the bug in main.rs"
-  codeagent --backend claude "Implement feature X"
+  codeagent "Implement feature X" /path/to/workdir
+  codeagent --backend claude - <<'EOF'
+  Multi-line task with @file references
+  EOF
   codeagent resume abc123 "Continue work"
   codeagent --parallel < tasks.txt
   codeagent init --force
