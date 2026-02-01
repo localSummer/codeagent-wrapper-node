@@ -1,5 +1,7 @@
 # codeagent-wrapper (Rust)
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 A high-performance wrapper for AI CLI backends (Claude, Codex, Gemini, Opencode).
 
 ## Features
