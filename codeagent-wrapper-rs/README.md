@@ -20,22 +20,22 @@ Download the latest release for your platform:
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/user/codeagent-wrapper/releases/latest/download/codeagent-aarch64-apple-darwin -o codeagent
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-apple-darwin -o codeagent
 chmod +x codeagent
 sudo mv codeagent /usr/local/bin/
 
 # macOS (Intel)
-curl -L https://github.com/user/codeagent-wrapper/releases/latest/download/codeagent-x86_64-apple-darwin -o codeagent
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-apple-darwin -o codeagent
 chmod +x codeagent
 sudo mv codeagent /usr/local/bin/
 
 # Linux (x86_64)
-curl -L https://github.com/user/codeagent-wrapper/releases/latest/download/codeagent-x86_64-unknown-linux-gnu -o codeagent
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-x86_64-unknown-linux-gnu -o codeagent
 chmod +x codeagent
 sudo mv codeagent /usr/local/bin/
 
 # Linux (ARM64)
-curl -L https://github.com/user/codeagent-wrapper/releases/latest/download/codeagent-aarch64-unknown-linux-gnu -o codeagent
+curl -L https://github.com/localSummer/codeagent-wrapper-node/releases/latest/download/codeagent-aarch64-unknown-linux-gnu -o codeagent
 chmod +x codeagent
 sudo mv codeagent /usr/local/bin/
 ```
@@ -43,7 +43,7 @@ sudo mv codeagent /usr/local/bin/
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap user/codeagent-wrapper
+brew tap localSummer/codeagent
 brew install codeagent-wrapper
 ```
 
@@ -103,14 +103,14 @@ codeagent --cleanup
 
 ### Environment variables
 
-| Variable | Description |
-|----------|-------------|
-| `CODEAGENT_BACKEND` | Default backend |
-| `CODEAGENT_MODEL` | Default model |
-| `CODEX_TIMEOUT` | Task timeout in seconds |
-| `CODEAGENT_SKIP_PERMISSIONS` | Skip permission checks |
-| `CODEAGENT_QUIET` | Suppress progress output |
-| `CODEAGENT_DEBUG` | Enable debug logging |
+| Variable                     | Description              |
+| ---------------------------- | ------------------------ |
+| `CODEAGENT_BACKEND`          | Default backend          |
+| `CODEAGENT_MODEL`            | Default model            |
+| `CODEX_TIMEOUT`              | Task timeout in seconds  |
+| `CODEAGENT_SKIP_PERMISSIONS` | Skip permission checks   |
+| `CODEAGENT_QUIET`            | Suppress progress output |
+| `CODEAGENT_DEBUG`            | Enable debug logging     |
 
 ### Config files
 
@@ -121,13 +121,13 @@ codeagent --cleanup
 
 Measured on Apple M1 Pro, macOS 14.0
 
-| Metric | Node.js | Rust | Improvement |
-|--------|---------|------|-------------|
-| Cold start | ~80ms | **6ms** | **13x faster** |
-| JSON parsing (1K events) | ~23ms | **1.03ms** | **22x faster** |
-| JSON throughput | ~10 MiB/s | **100 MiB/s** | **10x faster** |
-| Memory usage | ~35MB | **~3MB** | **12x less** |
-| Binary size | N/A | **2.1MB** | Single file |
+| Metric                   | Node.js   | Rust          | Improvement    |
+| ------------------------ | --------- | ------------- | -------------- |
+| Cold start               | ~80ms     | **6ms**       | **13x faster** |
+| JSON parsing (1K events) | ~23ms     | **1.03ms**    | **22x faster** |
+| JSON throughput          | ~10 MiB/s | **100 MiB/s** | **10x faster** |
+| Memory usage             | ~35MB     | **~3MB**      | **12x less**   |
+| Binary size              | N/A       | **2.1MB**     | Single file    |
 
 ### Benchmark details
 
@@ -193,8 +193,31 @@ cargo fmt
 ### Lint
 
 ```bash
-cargo clippy
+cargo clippy -- -D warnings
 ```
+
+## Code Quality
+
+This project maintains strict code quality standards:
+
+- ✅ Zero Clippy warnings (`-D warnings` flag)
+- ✅ Consistent formatting with `rustfmt`
+- ✅ Comprehensive test coverage (33 tests)
+- ✅ Reserved APIs documented with `#![allow(dead_code)]` comments
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Ensure code quality:
+   ```bash
+   cargo fmt
+   cargo clippy -- -D warnings
+   cargo test
+   ```
+4. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
 ## License
 
