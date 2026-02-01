@@ -228,10 +228,11 @@ pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec
 
         // Wait for a task to complete
         if running > 0
-            && let Some((task_id, result)) = rx.recv().await {
-                results.insert(task_id, result);
-                running -= 1;
-            }
+            && let Some((task_id, result)) = rx.recv().await
+        {
+            results.insert(task_id, result);
+            running -= 1;
+        }
     }
 
     // Return results in original order

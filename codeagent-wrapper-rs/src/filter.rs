@@ -42,8 +42,7 @@ impl Default for OutputFilter {
 
 /// Sanitize output for JSON embedding
 pub fn sanitize_for_json(input: &str) -> String {
-    input
-        .replace(['\x00', '\x08', '\x0c'], "")
+    input.replace(['\x00', '\x08', '\x0c'], "")
 }
 
 /// Extract test coverage from output
@@ -58,10 +57,11 @@ pub fn extract_coverage(output: &str) -> Option<f64> {
     for pattern in patterns {
         if let Ok(re) = Regex::new(pattern)
             && let Some(caps) = re.captures(output)
-                && let Some(m) = caps.get(1)
-                    && let Ok(val) = m.as_str().parse::<f64>() {
-                        return Some(val);
-                    }
+            && let Some(m) = caps.get(1)
+            && let Ok(val) = m.as_str().parse::<f64>()
+        {
+            return Some(val);
+        }
     }
 
     None
@@ -78,10 +78,11 @@ pub fn extract_files_changed(output: &str) -> Option<usize> {
     for pattern in patterns {
         if let Ok(re) = Regex::new(pattern)
             && let Some(caps) = re.captures(output)
-                && let Some(m) = caps.get(1)
-                    && let Ok(val) = m.as_str().parse::<usize>() {
-                        return Some(val);
-                    }
+            && let Some(m) = caps.get(1)
+            && let Ok(val) = m.as_str().parse::<usize>()
+        {
+            return Some(val);
+        }
     }
 
     None
@@ -91,21 +92,22 @@ pub fn extract_files_changed(output: &str) -> Option<usize> {
 pub fn extract_test_results(output: &str) -> Option<(usize, usize, usize)> {
     // Pattern: X passed, Y failed, Z skipped
     if let Ok(re) = Regex::new(r"(\d+)\s*passed.*?(\d+)\s*failed.*?(\d+)\s*skipped")
-        && let Some(caps) = re.captures(output) {
-            let passed = caps
-                .get(1)
-                .and_then(|m| m.as_str().parse().ok())
-                .unwrap_or(0);
-            let failed = caps
-                .get(2)
-                .and_then(|m| m.as_str().parse().ok())
-                .unwrap_or(0);
-            let skipped = caps
-                .get(3)
-                .and_then(|m| m.as_str().parse().ok())
-                .unwrap_or(0);
-            return Some((passed, failed, skipped));
-        }
+        && let Some(caps) = re.captures(output)
+    {
+        let passed = caps
+            .get(1)
+            .and_then(|m| m.as_str().parse().ok())
+            .unwrap_or(0);
+        let failed = caps
+            .get(2)
+            .and_then(|m| m.as_str().parse().ok())
+            .unwrap_or(0);
+        let skipped = caps
+            .get(3)
+            .and_then(|m| m.as_str().parse().ok())
+            .unwrap_or(0);
+        return Some((passed, failed, skipped));
+    }
 
     None
 }

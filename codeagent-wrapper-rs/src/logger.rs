@@ -87,15 +87,16 @@ pub async fn cleanup_old_logs() -> Result<()> {
         let path = entry.path();
         if path.extension().is_some_and(|ext| ext == "log")
             && let Ok(metadata) = entry.metadata().await
-                && let Ok(modified) = metadata.modified()
-                    && let Ok(age) = now.duration_since(modified)
-                        && age > max_age {
-                            let size = metadata.len();
-                            if fs::remove_file(&path).await.is_ok() {
-                                deleted_count += 1;
-                                deleted_size += size;
-                            }
-                        }
+            && let Ok(modified) = metadata.modified()
+            && let Ok(age) = now.duration_since(modified)
+            && age > max_age
+        {
+            let size = metadata.len();
+            if fs::remove_file(&path).await.is_ok() {
+                deleted_count += 1;
+                deleted_size += size;
+            }
+        }
     }
 
     println!(
