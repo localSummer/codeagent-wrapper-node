@@ -19,22 +19,46 @@ use crate::signal::setup_signal_handler;
 
 /// Essential environment variables for AI CLI backends
 const ESSENTIAL_ENV_VARS: &[&str] = &[
-    "PATH", "HOME", "USER", "SHELL", "TERM",
-    "LANG", "LC_ALL", "LC_CTYPE",
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "TERM",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
     // AI backend API keys
-    "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
-    "GOOGLE_API_KEY", "AZURE_OPENAI_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "AZURE_OPENAI_API_KEY",
     // Proxy settings
-    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
     // Common development tools
-    "NODE_PATH", "PYTHONPATH", "GEM_PATH", "GOPATH",
+    "NODE_PATH",
+    "PYTHONPATH",
+    "GEM_PATH",
+    "GOPATH",
     // Terminal and display
-    "DISPLAY", "COLORTERM", "TERM_PROGRAM",
+    "DISPLAY",
+    "COLORTERM",
+    "TERM_PROGRAM",
     // SSH and auth
-    "SSH_AUTH_SOCK", "GPG_AGENT_INFO",
+    "SSH_AUTH_SOCK",
+    "GPG_AGENT_INFO",
     // Codex/Codeagent specific
-    "CODEX_TIMEOUT", "CODEX_MODEL", "CODEX_BACKEND",
-    "CODEAGENT_QUIET", "CODEAGENT_ASCII_MODE", "CODEAGENT_PERFORMANCE_METRICS",
+    "CODEX_TIMEOUT",
+    "CODEX_MODEL",
+    "CODEX_BACKEND",
+    "CODEAGENT_QUIET",
+    "CODEAGENT_ASCII_MODE",
+    "CODEAGENT_PERFORMANCE_METRICS",
 ];
 
 /// Build process environment based on minimal_env setting
@@ -52,7 +76,14 @@ fn build_process_env(minimal_env: bool) -> HashMap<String, String> {
     }
 
     // Also include any environment variables that start with known prefixes
-    let prefixes = ["CODEX_", "CODEAGENT_", "OPENAI_", "ANTHROPIC_", "GEMINI_", "GOOGLE_"];
+    let prefixes = [
+        "CODEX_",
+        "CODEAGENT_",
+        "OPENAI_",
+        "ANTHROPIC_",
+        "GEMINI_",
+        "GOOGLE_",
+    ];
     for (key, value) in std::env::vars() {
         if prefixes.iter().any(|&prefix| key.starts_with(prefix)) {
             env.insert(key, value);
@@ -337,7 +368,9 @@ async fn run_single_task(cli: &Cli, spec: TaskSpec) -> Result<TaskResult> {
         prompt_file: spec.prompt_file.map(Into::into),
         timeout: cli.timeout,
         skip_permissions: spec.skip_permissions || cli.skip_permissions,
-        reasoning_effort: spec.reasoning_effort.or_else(|| cli.reasoning_effort.clone()),
+        reasoning_effort: spec
+            .reasoning_effort
+            .or_else(|| cli.reasoning_effort.clone()),
         minimal_env: spec.minimal_env || cli.minimal_env,
         quiet: cli.quiet,
         backend_output: cli.backend_output,

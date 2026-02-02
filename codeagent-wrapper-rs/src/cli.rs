@@ -188,13 +188,8 @@ mod tests {
 
     #[test]
     fn test_cli_reasoning_effort() {
-        let cli = Cli::try_parse_from([
-            "codeagent",
-            "--reasoning-effort",
-            "high",
-            "Test task",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["codeagent", "--reasoning-effort", "high", "Test task"]).unwrap();
         assert_eq!(cli.reasoning_effort, Some("high".to_string()));
     }
 
