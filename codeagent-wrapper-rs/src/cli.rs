@@ -46,8 +46,16 @@ pub struct Cli {
     pub timeout: u64,
 
     /// Skip permission checks (YOLO mode)
-    #[arg(long, env = "CODEAGENT_SKIP_PERMISSIONS")]
+    #[arg(long, alias = "yolo", env = "CODEAGENT_SKIP_PERMISSIONS")]
     pub skip_permissions: bool,
+
+    /// Reasoning effort level (for Codex backend)
+    #[arg(long, value_name = "LEVEL")]
+    pub reasoning_effort: Option<String>,
+
+    /// Use minimal environment variables (performance optimization)
+    #[arg(long)]
+    pub minimal_env: bool,
 
     /// Max parallel workers
     #[arg(long, env = "CODEAGENT_MAX_PARALLEL_WORKERS")]
@@ -164,5 +172,54 @@ mod tests {
             }
             _ => panic!("Expected Init command"),
         }
+    }
+
+    #[test]
+    fn test_cli_yolo_alias() {
+        let cli = Cli::try_parse_from(["codeagent", "--yolo", "Test task"]).unwrap();
+        assert!(cli.skip_permissions);
+    }
+
+    #[test]
+    fn test_cli_skip_permissions() {
+        let cli = Cli::try_parse_from(["codeagent", "--skip-permissions", "Test task"]).unwrap();
+        assert!(cli.skip_permissions);
+    }
+
+    #[test]
+    fn test_cli_reasoning_effort() {
+        let cli = Cli::try_parse_from([
+            "codeagent",
+            "--reasoning-effort",
+            "high",
+            "Test task",
+        ])
+        .unwrap();
+        assert_eq!(cli.reasoning_effort, Some("high".to_string()));
+    }
+
+    #[test]
+    fn test_cli_minimal_env() {
+        let cli = Cli::try_parse_from(["codeagent", "--minimal-env", "Test task"]).unwrap();
+        assert!(cli.minimal_env);
+    }
+
+    #[test]
+    fn test_cli_combined_flags() {
+        let cli = Cli::try_parse_from([
+            "codeagent",
+            "--backend",
+            "codex",
+            "--yolo",
+            "--reasoning-effort",
+            "medium",
+            "--minimal-env",
+            "Test task",
+        ])
+        .unwrap();
+        assert_eq!(cli.backend, Some("codex".to_string()));
+        assert!(cli.skip_permissions);
+        assert_eq!(cli.reasoning_effort, Some("medium".to_string()));
+        assert!(cli.minimal_env);
     }
 }

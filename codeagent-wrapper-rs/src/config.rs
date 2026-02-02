@@ -32,6 +32,10 @@ pub struct Config {
     pub timeout: u64,
     /// Skip permission checks
     pub skip_permissions: bool,
+    /// Reasoning effort level (for Codex backend)
+    pub reasoning_effort: Option<String>,
+    /// Use minimal environment variables (performance optimization)
+    pub minimal_env: bool,
     /// Quiet mode
     pub quiet: bool,
     /// Show backend output
@@ -60,6 +64,8 @@ impl Config {
             prompt_file: cli.prompt_file.as_ref().map(PathBuf::from),
             timeout: cli.timeout,
             skip_permissions: cli.skip_permissions,
+            reasoning_effort: cli.reasoning_effort.clone(),
+            minimal_env: cli.minimal_env,
             quiet: cli.quiet,
             backend_output: cli.backend_output || cli.debug,
             debug: cli.debug,
@@ -93,6 +99,8 @@ impl Config {
             prompt_file: cli.prompt_file.as_ref().map(PathBuf::from),
             timeout: cli.timeout,
             skip_permissions: cli.skip_permissions,
+            reasoning_effort: cli.reasoning_effort.clone(),
+            minimal_env: cli.minimal_env,
             quiet: cli.quiet,
             backend_output: cli.backend_output || cli.debug,
             debug: cli.debug,
@@ -131,6 +139,12 @@ pub struct TaskSpec {
     /// Skip permissions
     #[serde(default, rename = "skipPermissions")]
     pub skip_permissions: bool,
+    /// Reasoning effort level
+    #[serde(default, rename = "reasoningEffort")]
+    pub reasoning_effort: Option<String>,
+    /// Use minimal environment variables
+    #[serde(default, rename = "minimalEnv")]
+    pub minimal_env: bool,
 }
 
 /// Parallel execution configuration

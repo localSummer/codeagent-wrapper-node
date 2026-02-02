@@ -53,6 +53,11 @@ impl Backend for CodexBackend {
             args.push(model.clone());
         }
 
+        if let Some(ref reasoning_effort) = config.reasoning_effort {
+            args.push("--reasoning-effort".to_string());
+            args.push(reasoning_effort.clone());
+        }
+
         if config.skip_permissions {
             args.push("--full-auto".to_string());
         }

@@ -1,6 +1,7 @@
 //! Task executor for running backend commands
 
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -15,6 +16,51 @@ use crate::config::{Config, ParallelConfig, TaskSpec};
 use crate::logger::Logger;
 use crate::parser::JsonStreamParser;
 use crate::signal::setup_signal_handler;
+
+/// Essential environment variables for AI CLI backends
+const ESSENTIAL_ENV_VARS: &[&str] = &[
+    "PATH", "HOME", "USER", "SHELL", "TERM",
+    "LANG", "LC_ALL", "LC_CTYPE",
+    // AI backend API keys
+    "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
+    "GOOGLE_API_KEY", "AZURE_OPENAI_API_KEY",
+    // Proxy settings
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+    // Common development tools
+    "NODE_PATH", "PYTHONPATH", "GEM_PATH", "GOPATH",
+    // Terminal and display
+    "DISPLAY", "COLORTERM", "TERM_PROGRAM",
+    // SSH and auth
+    "SSH_AUTH_SOCK", "GPG_AGENT_INFO",
+    // Codex/Codeagent specific
+    "CODEX_TIMEOUT", "CODEX_MODEL", "CODEX_BACKEND",
+    "CODEAGENT_QUIET", "CODEAGENT_ASCII_MODE", "CODEAGENT_PERFORMANCE_METRICS",
+];
+
+/// Build process environment based on minimal_env setting
+fn build_process_env(minimal_env: bool) -> HashMap<String, String> {
+    if !minimal_env {
+        return std::env::vars().collect();
+    }
+
+    // Build minimal environment with only essential variables
+    let mut env = HashMap::new();
+    for &key in ESSENTIAL_ENV_VARS {
+        if let Ok(value) = std::env::var(key) {
+            env.insert(key.to_string(), value);
+        }
+    }
+
+    // Also include any environment variables that start with known prefixes
+    let prefixes = ["CODEX_", "CODEAGENT_", "OPENAI_", "ANTHROPIC_", "GEMINI_", "GOOGLE_"];
+    for (key, value) in std::env::vars() {
+        if prefixes.iter().any(|&prefix| key.starts_with(prefix)) {
+            env.insert(key, value);
+        }
+    }
+
+    env
+}
 
 /// Task execution result
 #[derive(Debug, Clone, Default)]
@@ -76,10 +122,15 @@ impl TaskExecutor {
             "Executing task"
         );
 
+        // Build environment (use minimal env if requested for performance)
+        let process_env = build_process_env(self.config.minimal_env);
+
         // Spawn process
         let mut child = Command::new(self.backend.command())
             .args(&args)
             .current_dir(&self.config.work_dir)
+            .env_clear()
+            .envs(&process_env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -197,7 +248,6 @@ fn should_use_stdin(task: &str) -> bool {
 
 /// Run tasks in parallel
 pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec<TaskResult>> {
-    use std::collections::HashMap;
     use tokio::sync::mpsc;
 
     let max_workers = cli
@@ -287,6 +337,8 @@ async fn run_single_task(cli: &Cli, spec: TaskSpec) -> Result<TaskResult> {
         prompt_file: spec.prompt_file.map(Into::into),
         timeout: cli.timeout,
         skip_permissions: spec.skip_permissions || cli.skip_permissions,
+        reasoning_effort: spec.reasoning_effort.or_else(|| cli.reasoning_effort.clone()),
+        minimal_env: spec.minimal_env || cli.minimal_env,
         quiet: cli.quiet,
         backend_output: cli.backend_output,
         debug: cli.debug,
