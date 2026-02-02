@@ -15,29 +15,48 @@ Execute codeagent-wrapper commands with pluggable AI backends (Codex, Claude, Ge
 - Large-scale refactoring across multiple files
 - Automated code generation with backend selection
 
+## Quick Reference
+
+Run `codeagent-wrapper --help` to see all available options.
+
+**CLI Usage Pattern**:
+
+```
+codeagent-wrapper [options] <task> [workdir]
+```
+
+**IMPORTANT**: When using stdin (`-`), you CANNOT specify working_dir as a separate positional argument. The `-` flag only marks stdin input; any path after it will be incorrectly parsed as the task content.
+
 ## Usage
 
-**HEREDOC syntax** (recommended):
+**HEREDOC with working directory** (recommended):
 
 ```bash
-codeagent-wrapper --backend codex - [working_dir] <<'__CODEAGENT_EOF__'
+# Option 1: cd to target directory first (recommended)
+cd /path/to/working/dir && codeagent-wrapper --backend codex - <<'__CODEAGENT_EOF__'
 <task content here>
 __CODEAGENT_EOF__
-```
 
-**With backend selection**:
-
-```bash
-codeagent-wrapper --backend claude - . <<'__CODEAGENT_EOF__'
+# Option 2: Use subshell to preserve current directory
+(cd /path/to/working/dir && codeagent-wrapper --backend codex - <<'__CODEAGENT_EOF__'
 <task content here>
 __CODEAGENT_EOF__
+)
 ```
 
-**Simple tasks**:
+**Simple tasks with working directory**:
 
 ```bash
-codeagent-wrapper --backend codex "simple task" [working_dir]
-codeagent-wrapper --backend gemini "simple task" [working_dir]
+codeagent-wrapper --backend codex "simple task" /path/to/working/dir
+codeagent-wrapper --backend gemini "simple task" /path/to/working/dir
+```
+
+**Current directory** (no workdir needed):
+
+```bash
+codeagent-wrapper --backend claude - <<'__CODEAGENT_EOF__'
+<task content here>
+__CODEAGENT_EOF__
 ```
 
 ## Reliable HEREDOC Usage (script-safe)
@@ -45,10 +64,13 @@ codeagent-wrapper --backend gemini "simple task" [working_dir]
 Use a unique delimiter and keep it at column 1. This avoids "unexpected end of file" errors.
 
 ```bash
-codeagent-wrapper --backend codex - /path/to/dir <<'__CODEAGENT_EOF__'
+# Correct: cd first, then use stdin
+cd /path/to/dir && codeagent-wrapper --backend codex - <<'__CODEAGENT_EOF__'
 <task content here>
 __CODEAGENT_EOF__
 ```
+
+**WARNING**: Do NOT use `codeagent-wrapper - /path/to/dir` format. The path will be parsed as task content, not working directory.
 
 ### Script checklist
 
@@ -71,7 +93,7 @@ __CODEAGENT_EOF__
 | -------- | -------------------- | -------------------------------- | ----------------------- | ------------------------------------ |
 | codex    | `--backend codex`    | `--full-auto`                    | OpenAI Codex (default)  | Code analysis, complex development   |
 | claude   | `--backend claude`   | `--dangerously-skip-permissions` | Anthropic Claude        | Simple tasks, documentation, prompts |
-| gemini   | `--backend gemini`   | `-y`                             | Google Gemini           | UI/UX prototyping                    |
+| gemini   | `--backend gemini`   | `--yolo`                         | Google Gemini           | UI/UX prototyping                    |
 | opencode | `--backend opencode` | -                                | Opencode (MiniMax-M2.1) | Code exploration                     |
 
 ### Backend Selection Guide
@@ -128,15 +150,13 @@ SESSION_ID: 019a7247-ac9d-71f3-89e2-a823dbd8fd14
 ## Resume Session
 
 ```bash
-# Resume with codex backend
-codeagent-wrapper --backend codex resume <session_id> - <<'__CODEAGENT_EOF__'
+# Resume with codex backend (in target directory)
+cd /path/to/dir && codeagent-wrapper --backend codex resume <session_id> - <<'__CODEAGENT_EOF__'
 <follow-up task>
 __CODEAGENT_EOF__
 
-# Resume with specific backend
-codeagent-wrapper --backend claude resume <session_id> - <<'__CODEAGENT_EOF__'
-<follow-up task>
-__CODEAGENT_EOF__
+# Resume with simple task string
+codeagent-wrapper --backend claude resume <session_id> "follow-up task"
 ```
 
 ## Parallel Execution
@@ -211,17 +231,28 @@ Set `CODEAGENT_MAX_PARALLEL_WORKERS` to limit concurrent tasks (default: unlimit
 
 ## Invocation Pattern
 
-**Single Task**:
+**Single Task with working directory**:
 
 ```
 Bash tool parameters:
-- command: codeagent-wrapper --backend <backend> - [working_dir] <<'__CODEAGENT_EOF__'
+- command: cd /path/to/working/dir && codeagent-wrapper --backend <backend> - <<'__CODEAGENT_EOF__'
   <task content>
   __CODEAGENT_EOF__
 - timeout: 7200000
 - description: <brief description>
 
-Note: --backend is optional (default: codex). Add it for non-default backend.
+Note: --backend is optional (default: codex). Use cd to set working directory before invoking.
+```
+
+**Single Task in current directory**:
+
+```
+Bash tool parameters:
+- command: codeagent-wrapper --backend <backend> - <<'__CODEAGENT_EOF__'
+  <task content>
+  __CODEAGENT_EOF__
+- timeout: 7200000
+- description: <brief description>
 ```
 
 **Parallel Tasks**:

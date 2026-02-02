@@ -1,6 +1,6 @@
 [package]
 name = "codeagent-wrapper"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2024"
 authors = ["codeagent-wrapper contributors"]
 description = "A high-performance wrapper for AI CLI backends (Claude, Codex, Gemini, Opencode)"

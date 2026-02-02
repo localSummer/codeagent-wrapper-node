@@ -93,7 +93,7 @@ __CODEAGENT_EOF__
 | -------- | -------------------- | -------------------------------- | ----------------------- | ------------------------------------ |
 | codex    | `--backend codex`    | `--full-auto`                    | OpenAI Codex (default)  | Code analysis, complex development   |
 | claude   | `--backend claude`   | `--dangerously-skip-permissions` | Anthropic Claude        | Simple tasks, documentation, prompts |
-| gemini   | `--backend gemini`   | `-y`                             | Google Gemini           | UI/UX prototyping                    |
+| gemini   | `--backend gemini`   | `--yolo`                         | Google Gemini           | UI/UX prototyping                    |
 | opencode | `--backend opencode` | -                                | Opencode (MiniMax-M2.1) | Code exploration                     |
 
 ### Backend Selection Guide

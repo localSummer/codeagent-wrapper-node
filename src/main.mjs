@@ -2,18 +2,23 @@
  * Main module - CLI entry point and orchestration
  */
 
-import { parseCliArgs, parseParallelConfigStream, validateConfig, loadEnvConfig } from './config.mjs';
-import { selectBackend } from './backend.mjs';
-import { runTask, runParallel } from './executor.mjs';
-import { createLogger, cleanupOldLogs } from './logger.mjs';
-import { generateFinalOutput, formatProgressMessage } from './utils.mjs';
-import { getAgentConfig, loadModelsConfig } from './agent-config.mjs';
-import { runInit } from './init.mjs';
-import * as readline from 'readline';
-import { createRequire } from 'module';
+import {
+  parseCliArgs,
+  parseParallelConfigStream,
+  validateConfig,
+  loadEnvConfig,
+} from "./config.mjs";
+import { selectBackend } from "./backend.mjs";
+import { runTask, runParallel } from "./executor.mjs";
+import { createLogger, cleanupOldLogs } from "./logger.mjs";
+import { generateFinalOutput, formatProgressMessage } from "./utils.mjs";
+import { getAgentConfig, loadModelsConfig } from "./agent-config.mjs";
+import { runInit } from "./init.mjs";
+import * as readline from "readline";
+import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const pkg = require('../package.json');
+const pkg = require("../package.json");
 const VERSION = pkg.version;
 
 const HELP_HEADER = `
@@ -164,8 +169,8 @@ const HELP_TEXT = [
   HELP_OPTIONS,
   HELP_ENV,
   HELP_EXAMPLES,
-  HELP_QUICKSTART
-].join('\n');
+  HELP_QUICKSTART,
+].join("\n");
 
 /**
  * Read task from stdin
@@ -174,14 +179,14 @@ const HELP_TEXT = [
 async function readStdinTask() {
   const rl = readline.createInterface({
     input: process.stdin,
-    crlfDelay: Infinity
+    crlfDelay: Infinity,
   });
 
   const lines = [];
   for await (const line of rl) {
     lines.push(line);
   }
-  return lines.join('\n').trim();
+  return lines.join("\n").trim();
 }
 
 /**
@@ -198,27 +203,27 @@ async function readParallelInput() {
  */
 export async function main(args) {
   // Handle --help
-  if (args.includes('--help') || args.includes('-h')) {
+  if (args.includes("--help") || args.includes("-h")) {
     console.log(HELP_TEXT);
     return;
   }
 
   // Handle --version
-  if (args.includes('--version') || args.includes('-v')) {
+  if (args.includes("--version") || args.includes("-v")) {
     console.log(VERSION);
     return;
   }
 
   // Handle --cleanup
-  if (args.includes('--cleanup')) {
+  if (args.includes("--cleanup")) {
     const count = await cleanupOldLogs();
     console.log(`Cleaned up ${count} old log files`);
     return;
   }
 
   // Handle init command
-  if (args.includes('init')) {
-    const force = args.includes('--force') || args.includes('-f');
+  if (args.includes("init")) {
+    const force = args.includes("--force") || args.includes("-f");
     await runInit({ force });
     return;
   }
@@ -234,7 +239,7 @@ export async function main(args) {
   // Handle parallel mode
   if (config.parallel) {
     const parallelConfig = await readParallelInput();
-    const logger = createLogger('parallel');
+    const logger = createLogger("parallel");
 
     try {
       const results = await runParallel(parallelConfig.tasks, {
@@ -243,7 +248,7 @@ export async function main(args) {
         fullOutput: config.fullOutput,
         logger,
         backendOutput: config.backendOutput,
-        minimalEnv: config.minimalEnv
+        minimalEnv: config.minimalEnv,
       });
 
       // Output results
@@ -252,12 +257,12 @@ export async function main(args) {
           console.log(`\n=== Task: ${result.taskId} ===`);
           console.log(result.message);
         } else {
-          const status = result.exitCode === 0 ? 'OK' : 'FAILED';
+          const status = result.exitCode === 0 ? "OK" : "FAILED";
           console.log(`[${status}] ${result.taskId}`);
         }
       }
 
-      const failed = results.filter(r => r.exitCode !== 0);
+      const failed = results.filter((r) => r.exitCode !== 0);
       if (failed.length > 0) {
         const error = new Error(`${failed.length} task(s) failed`);
         error.exitCode = 1;
@@ -270,7 +275,7 @@ export async function main(args) {
   }
 
   // Handle stdin task
-  if (config.explicitStdin || config.task === '-') {
+  if (config.explicitStdin || config.task === "-") {
     config.task = await readStdinTask();
   }
 
@@ -287,11 +292,12 @@ export async function main(args) {
     if (!config.backend) config.backend = agentConfig.backend;
     if (!config.model) config.model = agentConfig.model;
     if (!config.promptFile) config.promptFile = agentConfig.promptFile;
-    if (!config.reasoningEffort) config.reasoningEffort = agentConfig.reasoningEffort;
+    if (!config.reasoningEffort)
+      config.reasoningEffort = agentConfig.reasoningEffort;
   }
 
   // Select backend
-  const backend = selectBackend(config.backend || 'codex');
+  const backend = selectBackend(config.backend || "codex");
 
   // Create logger
   const logger = createLogger();
@@ -300,22 +306,24 @@ export async function main(args) {
   const taskStartTime = Date.now();
 
   // Create progress callback (only if not in quiet mode)
-  const onProgress = config.quiet ? null : (progressEvent) => {
-    try {
-      const message = formatProgressMessage(progressEvent, taskStartTime);
-      if (message) {
-        process.stderr.write(message + '\n');
-      }
-    } catch (error) {
-      logger.error(`Progress callback error: ${error.message}`);
-    }
-  };
+  const onProgress = config.quiet
+    ? null
+    : (progressEvent) => {
+        try {
+          const message = formatProgressMessage(progressEvent, taskStartTime);
+          if (message) {
+            process.stderr.write(message + "\n");
+          }
+        } catch (error) {
+          logger.error(`Progress callback error: ${error.message}`);
+        }
+      };
 
   try {
     // Run task
     const result = await runTask(
       {
-        id: 'main',
+        id: "main",
         task: config.task,
         workDir: config.workDir || process.cwd(),
         sessionId: config.sessionId,
@@ -323,7 +331,7 @@ export async function main(args) {
         model: config.model,
         promptFile: config.promptFile,
         skipPermissions: config.skipPermissions,
-        minimalEnv: config.minimalEnv
+        minimalEnv: config.minimalEnv,
       },
       backend,
       {
@@ -331,8 +339,8 @@ export async function main(args) {
         logger,
         onProgress,
         backendOutput: config.backendOutput,
-        minimalEnv: config.minimalEnv
-      }
+        minimalEnv: config.minimalEnv,
+      },
     );
 
     // Generate output
@@ -340,7 +348,7 @@ export async function main(args) {
     console.log(output);
 
     if (result.exitCode !== 0) {
-      const error = new Error(result.error || 'Task failed');
+      const error = new Error(result.error || "Task failed");
       error.exitCode = result.exitCode;
       throw error;
     }
@@ -358,8 +366,9 @@ export async function main(args) {
  */
 function applyEnvConfigOverrides(config, envConfig, args) {
   const merged = { ...config };
-  const hasTimeoutFlag = args.includes('--timeout');
-  const hasSkipFlag = args.includes('--skip-permissions') || args.includes('--yolo');
+  const hasTimeoutFlag = args.includes("--timeout");
+  const hasSkipFlag =
+    args.includes("--skip-permissions") || args.includes("--yolo");
 
   if (Number.isFinite(envConfig.timeout) && !hasTimeoutFlag) {
     merged.timeout = envConfig.timeout;

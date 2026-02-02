@@ -7,14 +7,14 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(name = "codeagent")]
 #[command(author, version, about, long_about = None)]
 #[command(after_help = r#"Examples:
-  codeagent "Fix the bug in main.rs"
-  codeagent "Implement feature X" /path/to/workdir
-  codeagent --backend claude - <<'EOF'
+  codeagent-wrapper "Fix the bug in main.rs"
+  codeagent-wrapper "Implement feature X" /path/to/workdir
+  codeagent-wrapper --backend claude - <<'EOF'
   Multi-line task with @file references
   EOF
-  codeagent resume abc123 "Continue work"
-  codeagent --parallel < tasks.txt
-  codeagent init --force
+  codeagent-wrapper resume abc123 "Continue work"
+  codeagent-wrapper --parallel < tasks.txt
+  codeagent-wrapper init --force
 "#)]
 pub struct Cli {
     /// Task to execute (prompt or instruction)
