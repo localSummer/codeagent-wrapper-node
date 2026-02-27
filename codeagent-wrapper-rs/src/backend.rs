@@ -100,9 +100,6 @@ impl Backend for ClaudeBackend {
             args.push(session_id.clone());
         }
 
-        // Disable settings source to prevent infinite recursion
-        args.push("--disable-settings-source".to_string());
-
         args.push(target.to_string());
         args
     }

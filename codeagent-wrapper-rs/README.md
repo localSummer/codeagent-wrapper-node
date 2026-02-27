@@ -205,6 +205,7 @@ codeagent-wrapper "Your task"
 - ✅ Session resume functionality
 - ✅ Parallel execution
 - ✅ All backends (Claude, Codex, Gemini, Opencode)
+- ✅ Claude backend keeps Claude CLI default settings source resolution (no forced `--disable-settings-source`)
 
 ### Breaking changes
 
