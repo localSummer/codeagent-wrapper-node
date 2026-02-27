@@ -2,9 +2,8 @@
  * Agent configuration management
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { expandHome } from './utils.mjs';
+import * as fs from "fs/promises";
+import { expandHome } from "./utils.mjs";
 
 /**
  * @typedef {Object} AgentModelConfig
@@ -25,46 +24,46 @@ import { expandHome } from './utils.mjs';
  * Default agent configurations
  */
 export const DEFAULT_MODELS_CONFIG = {
-  defaultBackend: 'opencode',
-  defaultModel: 'opencode/grok-code',
+  defaultBackend: "opencode",
+  defaultModel: "opencode/grok-code",
   agents: {
     oracle: {
-      backend: 'claude',
-      model: 'claude-opus-4-5-20251101',
-      promptFile: '',
-      reasoningEffort: ''
+      backend: "claude",
+      model: "",
+      promptFile: "",
+      reasoningEffort: "",
     },
     librarian: {
-      backend: 'claude',
-      model: 'claude-sonnet-4-5-20250929',
-      promptFile: '',
-      reasoningEffort: ''
+      backend: "claude",
+      model: "",
+      promptFile: "",
+      reasoningEffort: "",
     },
     explore: {
-      backend: 'opencode',
-      model: 'opencode/grok-code',
-      promptFile: '',
-      reasoningEffort: ''
+      backend: "opencode",
+      model: "opencode/grok-code",
+      promptFile: "",
+      reasoningEffort: "",
     },
     develop: {
-      backend: 'codex',
-      model: '',
-      promptFile: '',
-      reasoningEffort: ''
+      backend: "codex",
+      model: "",
+      promptFile: "",
+      reasoningEffort: "",
     },
-    'frontend-ui-ux-engineer': {
-      backend: 'gemini',
-      model: '',
-      promptFile: '',
-      reasoningEffort: ''
+    "frontend-ui-ux-engineer": {
+      backend: "gemini",
+      model: "",
+      promptFile: "",
+      reasoningEffort: "",
     },
-    'document-writer': {
-      backend: 'gemini',
-      model: '',
-      promptFile: '',
-      reasoningEffort: ''
-    }
-  }
+    "document-writer": {
+      backend: "gemini",
+      model: "",
+      promptFile: "",
+      reasoningEffort: "",
+    },
+  },
 };
 
 /**
@@ -82,20 +81,22 @@ export async function loadModelsConfig() {
     return cachedConfig;
   }
 
-  const configPath = expandHome('~/.codeagent/models.json');
+  const configPath = expandHome("~/.codeagent/models.json");
 
   try {
-    const content = await fs.readFile(configPath, 'utf-8');
+    const content = await fs.readFile(configPath, "utf-8");
     const userConfig = JSON.parse(content);
 
     // Merge with defaults
     cachedConfig = {
-      defaultBackend: userConfig.defaultBackend || DEFAULT_MODELS_CONFIG.defaultBackend,
-      defaultModel: userConfig.defaultModel || DEFAULT_MODELS_CONFIG.defaultModel,
+      defaultBackend:
+        userConfig.defaultBackend || DEFAULT_MODELS_CONFIG.defaultBackend,
+      defaultModel:
+        userConfig.defaultModel || DEFAULT_MODELS_CONFIG.defaultModel,
       agents: {
         ...DEFAULT_MODELS_CONFIG.agents,
-        ...userConfig.agents
-      }
+        ...userConfig.agents,
+      },
     };
   } catch (error) {
     // Use defaults if file doesn't exist or is invalid
@@ -127,7 +128,7 @@ export function getAgentConfig(name) {
   const agent = config.agents[name];
 
   if (!agent) {
-    const available = Object.keys(config.agents).join(', ');
+    const available = Object.keys(config.agents).join(", ");
     const error = new Error(`Unknown agent: ${name}. Available: ${available}`);
     error.exitCode = 2;
     throw error;
@@ -142,7 +143,7 @@ export function getAgentConfig(name) {
  * @returns {boolean}
  */
 export function validateAgentName(name) {
-  if (!name || typeof name !== 'string') {
+  if (!name || typeof name !== "string") {
     return false;
   }
   // Agent names: alphanumeric, hyphens, underscores
@@ -166,7 +167,7 @@ export function getDefaults() {
   const config = loadModelsConfigSync();
   return {
     backend: config.defaultBackend,
-    model: config.defaultModel
+    model: config.defaultModel,
   };
 }
 
