@@ -20,6 +20,7 @@ use clap::Parser;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tracing::info;
 
+use crate::agent_config::resolve_agent_for_runtime_config;
 use crate::backend::select_backend;
 use crate::cli::{Cli, Command};
 use crate::config::Config;
@@ -90,7 +91,9 @@ async fn main() -> Result<()> {
 }
 
 /// Run a single task
-async fn run_task(config: Config) -> Result<()> {
+async fn run_task(mut config: Config) -> Result<()> {
+    resolve_agent_for_runtime_config(&mut config).await?;
+
     let backend = select_backend(config.backend.as_deref())?;
     let executor = TaskExecutor::new(backend, &config)?;
     let result = executor.run().await?;

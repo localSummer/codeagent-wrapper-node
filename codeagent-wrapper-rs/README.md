@@ -77,6 +77,49 @@ codeagent-wrapper --backend claude "Implement feature X"
 codeagent-wrapper --backend codex --model gpt-4 "Optimize this function"
 ```
 
+### Agent presets
+
+Use `-a, --agent <AGENT>` to apply a preset from `~/.codeagent/models.json`:
+
+```bash
+codeagent-wrapper --agent oracle "Analyze this codebase"
+codeagent-wrapper --agent develop "Implement feature X"
+```
+
+Built-in presets (used when `~/.codeagent/models.json` is missing):
+
+| Agent                     | Backend  | Model               |
+| ------------------------- | -------- | ------------------- |
+| `oracle`                  | `claude` | `claude-sonnet-4-6` |
+| `librarian`               | `claude` | `claude-sonnet-4-6` |
+| `explore`                 | `codex`  | (unset)             |
+| `develop`                 | `codex`  | (unset)             |
+| `frontend-ui-ux-engineer` | `gemini` | (unset)             |
+| `document-writer`         | `gemini` | (unset)             |
+
+### Override behavior
+
+When `--agent` is set, runtime values are resolved in this order:
+
+1. Explicit CLI flags (highest): `--backend`, `--model`, `--prompt-file`, `--reasoning-effort`, `--skip-permissions`
+2. Agent preset values in `models.json`
+3. Backend auto-detection if backend is still unset
+
+In parallel mode, task-level fields are applied before global CLI flags, then agent preset fallback.
+
+Examples:
+
+```bash
+# Override backend/model from CLI
+codeagent-wrapper --agent oracle --backend codex --model gpt-5.2 "Implement feature X"
+
+# Override model from CLI
+codeagent-wrapper --agent oracle --model claude-opus-4-5 "Deep architecture review"
+
+# Override prompt file from CLI
+codeagent-wrapper --agent oracle --prompt-file ./prompts/review.md "Review this module"
+```
+
 ### Resume a session
 
 ```bash
@@ -116,8 +159,9 @@ codeagent-wrapper --cleanup
 
 ### Config files
 
-- `~/.codeagent/agents.yaml` - Agent presets
-- `~/.codeagent/models.yaml` - Model configurations
+- `~/.codeagent/models.json` - Agent and model config (`defaultBackend`, `defaultModel`, `agents`)
+- Agent fields: `backend`, `model`, `promptFile`, `reasoningEffort`, `skipPermissions`
+- If `~/.codeagent/models.json` does not exist, built-in defaults are used (matching the current default models.json content)
 
 ## Performance
 
@@ -156,7 +200,7 @@ codeagent-wrapper "Your task"
 ### Compatibility
 
 - ✅ All CLI flags and options
-- ✅ Config file formats (agents.yaml, models.yaml)
+- ✅ Config file format (models.json)
 - ✅ Environment variables
 - ✅ Session resume functionality
 - ✅ Parallel execution
@@ -204,7 +248,7 @@ This project maintains strict code quality standards:
 
 - ✅ Zero Clippy warnings (`-D warnings` flag)
 - ✅ Consistent formatting with `rustfmt`
-- ✅ Comprehensive test coverage (33 tests)
+- ✅ Comprehensive test coverage (38 unit tests + 5 integration tests)
 - ✅ Reserved APIs documented with `#![allow(dead_code)]` comments
 
 ## Contributing

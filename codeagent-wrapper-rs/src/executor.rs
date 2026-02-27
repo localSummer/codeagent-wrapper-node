@@ -10,6 +10,7 @@ use tokio::process::Command;
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
+use crate::agent_config::resolve_agent_for_runtime_config;
 use crate::backend::Backend;
 use crate::cli::Cli;
 use crate::config::{Config, ParallelConfig, TaskSpec};
@@ -349,7 +350,7 @@ pub async fn run_parallel_tasks(cli: &Cli, config: ParallelConfig) -> Result<Vec
 
 /// Run a single task from parallel config
 async fn run_single_task(cli: &Cli, spec: TaskSpec) -> Result<TaskResult> {
-    let config = Config {
+    let mut config = Config {
         mode: if spec.session_id.is_some() {
             "resume"
         } else {
@@ -376,6 +377,8 @@ async fn run_single_task(cli: &Cli, spec: TaskSpec) -> Result<TaskResult> {
         backend_output: cli.backend_output,
         debug: cli.debug,
     };
+
+    resolve_agent_for_runtime_config(&mut config).await?;
 
     let backend = crate::backend::select_backend(config.backend.as_deref())?;
     let executor = TaskExecutor::new(backend, &config)?;

@@ -77,6 +77,49 @@ codeagent-wrapper --backend claude "实现功能 X"
 codeagent-wrapper --backend codex --model gpt-4 "优化这个函数"
 ```
 
+### Agent 预设
+
+使用 `-a, --agent <AGENT>` 从 `~/.codeagent/models.json` 应用预设：
+
+```bash
+codeagent-wrapper --agent oracle "分析这个代码库"
+codeagent-wrapper --agent develop "实现新功能"
+```
+
+内置预设（当 `~/.codeagent/models.json` 不存在时使用）：
+
+| Agent                     | 后端     | 模型                |
+| ------------------------- | -------- | ------------------- |
+| `oracle`                  | `claude` | `claude-sonnet-4-6` |
+| `librarian`               | `claude` | `claude-sonnet-4-6` |
+| `explore`                 | `codex`  | （未设置）          |
+| `develop`                 | `codex`  | （未设置）          |
+| `frontend-ui-ux-engineer` | `gemini` | （未设置）          |
+| `document-writer`         | `gemini` | （未设置）          |
+
+### 覆盖规则
+
+当设置 `--agent` 时，运行时配置按以下优先级生效：
+
+1. CLI 显式参数（最高优先级）：`--backend`、`--model`、`--prompt-file`、`--reasoning-effort`、`--skip-permissions`
+2. `models.json` 中的 agent 预设值
+3. 若 backend 仍为空，则执行自动后端探测
+
+并行模式下，会先应用任务级字段，再应用全局 CLI 参数，最后回退到 agent 预设。
+
+示例：
+
+```bash
+# 用 CLI 覆盖 backend/model
+codeagent-wrapper --agent oracle --backend codex --model gpt-5.2 "实现功能 X"
+
+# 用 CLI 覆盖模型
+codeagent-wrapper --agent oracle --model claude-opus-4-5 "做一次深度架构评审"
+
+# 用 CLI 覆盖 prompt 文件
+codeagent-wrapper --agent oracle --prompt-file ./prompts/review.md "评审这个模块"
+```
+
 ### 恢复会话
 
 ```bash
@@ -116,8 +159,9 @@ codeagent-wrapper --cleanup
 
 ### 配置文件
 
-- `~/.codeagent/agents.yaml` - Agent 预设
-- `~/.codeagent/models.yaml` - 模型配置
+- `~/.codeagent/models.json` - Agent 与模型配置（`defaultBackend`、`defaultModel`、`agents`）
+- Agent 字段：`backend`、`model`、`promptFile`、`reasoningEffort`、`skipPermissions`
+- 如果 `~/.codeagent/models.json` 不存在，将使用内置默认配置（与当前默认 models.json 内容一致）
 
 ## 性能
 
@@ -156,7 +200,7 @@ codeagent-wrapper "你的任务"
 ### 兼容性
 
 - ✅ 所有 CLI 标志和选项
-- ✅ 配置文件格式（agents.yaml, models.yaml）
+- ✅ 配置文件格式（models.json）
 - ✅ 环境变量
 - ✅ 会话恢复功能
 - ✅ 并行执行
@@ -204,7 +248,7 @@ cargo clippy -- -D warnings
 
 - ✅ 零 Clippy 警告（`-D warnings` 标志）
 - ✅ 使用 `rustfmt` 保持一致的格式
-- ✅ 全面的测试覆盖（33 个测试）
+- ✅ 全面的测试覆盖（38 个单元测试 + 5 个集成测试）
 - ✅ 预留 API 使用 `#![allow(dead_code)]` 注释文档化
 
 ## 贡献

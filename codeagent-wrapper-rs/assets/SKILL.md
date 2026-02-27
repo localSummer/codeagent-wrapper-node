@@ -7,7 +7,9 @@ description: Execute codeagent-wrapper for multi-backend AI code tasks. Supports
 
 ## Overview
 
-Execute codeagent-wrapper commands with pluggable AI backends (Codex, Claude, Gemini, Opencode). Supports file references via `@` syntax, parallel task execution with backend selection, and configurable security controls.
+Execute codeagent-wrapper commands with pluggable AI backends (Codex, Claude, Gemini, Opencode). Supports file references via `@` syntax, parallel task execution with backend selection, agent presets from `~/.codeagent/models.json`, and configurable security controls.
+
+This document applies to the Rust implementation (`codeagent-wrapper`).
 
 ## When to Use
 
@@ -25,7 +27,11 @@ Run `codeagent-wrapper --help` to see all available options.
 codeagent-wrapper [options] <task> [workdir]
 ```
 
-**IMPORTANT**: When using stdin (`-`), you CANNOT specify working_dir as a separate positional argument. The `-` flag only marks stdin input; any path after it will be incorrectly parsed as the task content.
+When using stdin (`-`), you can still pass an optional working directory as the second positional argument:
+
+```bash
+echo "run tests" | codeagent-wrapper - /path/to/workdir
+```
 
 ## Usage
 
@@ -59,6 +65,34 @@ codeagent-wrapper --backend claude - <<'__CODEAGENT_EOF__'
 __CODEAGENT_EOF__
 ```
 
+## Agent Presets
+
+Use `-a, --agent <AGENT>` to apply a preset from `~/.codeagent/models.json`.
+
+```bash
+codeagent-wrapper --agent oracle "Analyze this repository"
+codeagent-wrapper --agent develop "Implement feature X"
+```
+
+Built-in presets are used when `~/.codeagent/models.json` is missing:
+
+| Agent                     | Backend  | Model               |
+| ------------------------- | -------- | ------------------- |
+| `oracle`                  | `claude` | `claude-sonnet-4-6` |
+| `librarian`               | `claude` | `claude-sonnet-4-6` |
+| `explore`                 | `codex`  | (unset)             |
+| `develop`                 | `codex`  | (unset)             |
+| `frontend-ui-ux-engineer` | `gemini` | (unset)             |
+| `document-writer`         | `gemini` | (unset)             |
+
+### Override Priority
+
+When `--agent` is set:
+
+1. Explicit CLI flags have highest priority (`--backend`, `--model`, `--prompt-file`, `--reasoning-effort`, `--skip-permissions`)
+2. Agent preset values fill missing fields
+3. Backend auto-detection is used only if backend is still unset
+
 ## Reliable HEREDOC Usage (script-safe)
 
 Use a unique delimiter and keep it at column 1. This avoids "unexpected end of file" errors.
@@ -70,7 +104,7 @@ cd /path/to/dir && codeagent-wrapper --backend codex - <<'__CODEAGENT_EOF__'
 __CODEAGENT_EOF__
 ```
 
-**WARNING**: Do NOT use `codeagent-wrapper - /path/to/dir` format. The path will be parsed as task content, not working directory.
+You can use `codeagent-wrapper - /path/to/dir` with stdin; `-` is task placeholder and `/path/to/dir` is workdir.
 
 ### Script checklist
 
@@ -91,14 +125,14 @@ __CODEAGENT_EOF__
 
 | Backend  | Command              | Parameters                       | Description             | Best For                             |
 | -------- | -------------------- | -------------------------------- | ----------------------- | ------------------------------------ |
-| codex    | `--backend codex`    | `--full-auto`                    | OpenAI Codex (default)  | Code analysis, complex development   |
+| codex    | `--backend codex`    | `--full-auto`                    | OpenAI Codex            | Code analysis, complex development   |
 | claude   | `--backend claude`   | `--dangerously-skip-permissions` | Anthropic Claude        | Simple tasks, documentation, prompts |
 | gemini   | `--backend gemini`   | `--yolo`                         | Google Gemini           | UI/UX prototyping                    |
 | opencode | `--backend opencode` | -                                | Opencode (MiniMax-M2.1) | Code exploration                     |
 
 ### Backend Selection Guide
 
-**Codex** (default):
+**Codex**:
 
 - Deep code understanding and complex logic implementation
 - Large-scale refactoring with precise dependency tracking
@@ -134,7 +168,11 @@ __CODEAGENT_EOF__
 
 - `task` (required): Task description, supports `@file` references
 - `working_dir` (optional): Working directory (default: current)
-- `--backend` (optional): Select AI backend (codex/claude/gemini/opencode, default: codex)
+- `--backend` (optional): Select AI backend (codex/claude/gemini/opencode). If omitted, backend is auto-detected (Claude -> Codex -> Gemini -> Opencode)
+- `--agent` / `-a` (optional): Apply agent preset from `~/.codeagent/models.json`
+- `--model` (optional): Model override
+- `--prompt-file` (optional): Read task content from file
+- `--reasoning-effort` (optional): Reasoning effort level (backend/model dependent)
 - `--skip-permissions` / `--yolo` (optional): Skip permission checks for Claude (`--dangerously-skip-permissions`) and Codex (`--full-auto`)
 - `--timeout` (optional): Timeout in seconds (default: 7200)
 
@@ -161,68 +199,31 @@ codeagent-wrapper --backend claude resume <session_id> "follow-up task"
 
 ## Parallel Execution
 
-**Default (summary mode - context-efficient):**
+Parallel mode reads **JSON Lines** from stdin (one task per line):
 
 ```bash
 codeagent-wrapper --parallel <<'__CODEAGENT_EOF__'
----TASK---
-id: task1
-backend: codex
-workdir: /path/to/dir
----CONTENT---
-task content
----TASK---
-id: task2
-dependencies: task1
----CONTENT---
-dependent task
+{"id":"task1","task":"analyze code structure","workDir":"/path/to/dir","backend":"codex"}
+{"id":"task2","task":"implement based on analysis","dependencies":["task1"],"agent":"develop"}
 __CODEAGENT_EOF__
 ```
 
-**Full output mode (for debugging):**
-
-```bash
-codeagent-wrapper --parallel --full-output <<'__CODEAGENT_EOF__'
-...
-__CODEAGENT_EOF__
-```
-
-**Output Modes:**
-
-- **Summary (default)**: Structured report with changes, output, verification, and review summary.
-- **Full (`--full-output`)**: Complete task messages. Use only when debugging specific failures.
-
-**With per-task backend**:
+With per-task backend and dependencies:
 
 ```bash
 codeagent-wrapper --parallel <<'__CODEAGENT_EOF__'
----TASK---
-id: task1
-backend: codex
-workdir: /path/to/dir
----CONTENT---
-analyze code structure
----TASK---
-id: task2
-backend: claude
-dependencies: task1
----CONTENT---
-design architecture based on analysis
----TASK---
-id: task3
-backend: gemini
-dependencies: task2
----CONTENT---
-generate implementation code
+{"id":"task1","task":"analyze code structure","backend":"codex","workDir":"/path/to/dir"}
+{"id":"task2","task":"design architecture based on analysis","backend":"claude","dependencies":["task1"]}
+{"id":"task3","task":"generate implementation code","backend":"gemini","dependencies":["task2"]}
 __CODEAGENT_EOF__
 ```
 
 **Concurrency Control**:
-Set `CODEAGENT_MAX_PARALLEL_WORKERS` to limit concurrent tasks (default: unlimited).
+Set `CODEAGENT_MAX_PARALLEL_WORKERS` to limit concurrent tasks (default: `min(100, cpuCount*4)`).
 
 ## Environment Variables
 
-- `CODEX_TIMEOUT`: Override timeout. If value > 10000, treated as milliseconds; otherwise (default: 7200s seconds = 2 hours)
+- `CODEX_TIMEOUT`: Override timeout in seconds (default: 7200 = 2 hours)
 - `CODEAGENT_SKIP_PERMISSIONS`: Control permission checks
   - For **Claude** backend: Adds `--dangerously-skip-permissions` (default: disabled)
   - For **Codex** backend: Adds `--full-auto` (default: disabled)
@@ -241,7 +242,7 @@ Bash tool parameters:
 - timeout: 7200000
 - description: <brief description>
 
-Note: --backend is optional (default: codex). Use cd to set working directory before invoking.
+Note: --backend is optional. If omitted, backend is resolved by CLI/backend auto-detection rules.
 ```
 
 **Single Task in current directory**:
@@ -260,18 +261,12 @@ Bash tool parameters:
 ```
 Bash tool parameters:
 - command: codeagent-wrapper --parallel <<'__CODEAGENT_EOF__'
-  ---TASK---
-  id: task_id
-  backend: <backend>  # Optional, defaults to codex
-  workdir: /path
-  dependencies: dep1, dep2
-  ---CONTENT---
-  task content
+  {"id":"task_id","task":"task content","backend":"<backend>","workDir":"/path","dependencies":["dep1","dep2"]}
   __CODEAGENT_EOF__
 - timeout: 7200000
 - description: <brief description>
 
-Note: Per-task backend is optional, defaults to codex. Global --backend can be set but per-task takes precedence.
+Note: Per-task backend is optional; if omitted, CLI `--backend` is used, then agent preset, then backend auto-detection.
 ```
 
 ## Critical Rules
@@ -314,5 +309,7 @@ Note: Per-task backend is optional, defaults to codex. Global --backend can be s
 ## Recent Updates
 
 - Multi-backend support for all modes (workdir, resume, parallel): Codex, Claude, Gemini, Opencode
+- Agent presets enabled in runtime via `--agent` / `-a` (single task + resume + parallel)
+- `~/.codeagent/models.json` is the active config source; built-in defaults are used when missing
 - Security controls with configurable permission checks (`--skip-permissions` / `--yolo`)
 - Concurrency limits with adaptive worker pool (min(100, cpuCount\*4))

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-02-27
+
+### Added
+
+- Agent 预设运行时接入：`--agent/-a` 现在在单任务与并行任务流程中都会生效
+- `~/.codeagent/models.json` 读取与默认值回退机制（文件缺失时使用内置默认 agent/model）
+- agent 字段扩展支持：`promptFile`、`reasoningEffort`、`skipPermissions`
+
+### Changed
+
+- `agent_config.rs` 从“预留 API”转为实际运行路径模块，并移除对应的 reserved 标记
+- Agent 配置合并优先级明确为：CLI 显式参数 > agent 预设 > backend 自动探测
+- README（中英文）与 SKILL.md 同步更新为当前 Rust 实现行为（models.json、Agent 预设、并行 JSON Lines 输入等）
+
+### Fixed
+
+- 修复 Rust 文档中配置文件描述不准确的问题（`agents.yaml/models.yaml` -> `models.json`）
+- 修复文档与实现不一致导致的使用歧义（agent 行为、stdin/workdir、并行输入格式）
+
 ## [1.0.7] - 2026-02-02
 
 ### Added
