@@ -205,6 +205,7 @@ codeagent-wrapper "你的任务"
 - ✅ 会话恢复功能
 - ✅ 并行执行
 - ✅ 所有后端（Claude、Codex、Gemini、Opencode）
+- ✅ Claude 后端为 `-p --output-format stream-json` 自动追加 `--verbose`（兼容 Claude Code 2.1.62+）
 - ✅ Claude 后端保持 Claude CLI 默认配置来源解析（不再强制追加 `--disable-settings-source`）
 
 ### 破坏性变更

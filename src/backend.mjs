@@ -58,7 +58,7 @@ class ClaudeBackend {
   }
 
   buildArgs(config, targetArg) {
-    const args = ["-p", "--output-format", "stream-json"];
+    const args = ["-p", "--output-format", "stream-json", "--verbose"];
 
     if (config.skipPermissions) {
       args.push("--dangerously-skip-permissions");

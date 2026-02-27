@@ -84,6 +84,7 @@ impl Backend for ClaudeBackend {
             "-p".to_string(),
             "--output-format".to_string(),
             "stream-json".to_string(),
+            "--verbose".to_string(),
         ];
 
         if config.skip_permissions {
@@ -245,6 +246,7 @@ mod tests {
         let args = backend.build_args(&config, "Test task");
         assert!(args.contains(&"--output-format".to_string()));
         assert!(args.contains(&"stream-json".to_string()));
+        assert!(args.contains(&"--verbose".to_string()));
         assert!(args.contains(&"--dangerously-skip-permissions".to_string()));
         assert!(args.contains(&"-r".to_string()));
         assert!(args.contains(&"abc123".to_string()));

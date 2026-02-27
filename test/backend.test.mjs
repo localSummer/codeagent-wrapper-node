@@ -72,6 +72,7 @@ describe('ClaudeBackend.buildArgs', () => {
     assert.ok(args.includes('-p'));
     assert.ok(args.includes('--output-format'));
     assert.ok(args.includes('stream-json'));
+    assert.ok(args.includes('--verbose'));
     assert.ok(args.includes('my task'));
   });
 
