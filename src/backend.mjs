@@ -14,30 +14,30 @@
  */
 class CodexBackend {
   name() {
-    return 'codex';
+    return "codex";
   }
 
   command() {
-    return 'codex';
+    return "codex";
   }
 
   buildArgs(config, targetArg) {
-    const args = ['e', '-C', config.workDir || process.cwd(), '--json'];
+    const args = ["e", "-C", config.workDir || process.cwd(), "--json"];
 
     if (config.sessionId) {
-      args.push('-r', config.sessionId);
+      args.push("-r", config.sessionId);
     }
 
     if (config.model) {
-      args.push('-m', config.model);
+      args.push("-m", config.model);
     }
 
     if (config.reasoningEffort) {
-      args.push('--reasoning-effort', config.reasoningEffort);
+      args.push("--reasoning-effort", config.reasoningEffort);
     }
 
     if (config.skipPermissions) {
-      args.push('--full-auto');
+      args.push("--full-auto");
     }
 
     args.push(targetArg);
@@ -50,30 +50,27 @@ class CodexBackend {
  */
 class ClaudeBackend {
   name() {
-    return 'claude';
+    return "claude";
   }
 
   command() {
-    return 'claude';
+    return "claude";
   }
 
   buildArgs(config, targetArg) {
-    const args = ['-p', '--output-format', 'stream-json'];
+    const args = ["-p", "--output-format", "stream-json"];
 
     if (config.skipPermissions) {
-      args.push('--dangerously-skip-permissions');
+      args.push("--dangerously-skip-permissions");
     }
 
     if (config.model) {
-      args.push('--model', config.model);
+      args.push("--model", config.model);
     }
 
     if (config.sessionId) {
-      args.push('-r', config.sessionId);
+      args.push("-r", config.sessionId);
     }
-
-    // Disable settings source to prevent infinite recursion
-    args.push('--disable-settings-source');
 
     args.push(targetArg);
     return args;
@@ -85,22 +82,22 @@ class ClaudeBackend {
  */
 class GeminiBackend {
   name() {
-    return 'gemini';
+    return "gemini";
   }
 
   command() {
-    return 'gemini';
+    return "gemini";
   }
 
   buildArgs(config, targetArg) {
-    const args = ['-o', 'stream-json', '-y'];
+    const args = ["-o", "stream-json", "-y"];
 
     if (config.model) {
-      args.push('-m', config.model);
+      args.push("-m", config.model);
     }
 
     if (config.sessionId) {
-      args.push('-r', config.sessionId);
+      args.push("-r", config.sessionId);
     }
 
     args.push(targetArg);
@@ -113,22 +110,22 @@ class GeminiBackend {
  */
 class OpencodeBackend {
   name() {
-    return 'opencode';
+    return "opencode";
   }
 
   command() {
-    return 'opencode';
+    return "opencode";
   }
 
   buildArgs(config, targetArg) {
-    const args = ['run', '--format', 'json'];
+    const args = ["run", "--format", "json"];
 
     if (config.model) {
-      args.push('-m', config.model);
+      args.push("-m", config.model);
     }
 
     if (config.sessionId) {
-      args.push('-s', config.sessionId);
+      args.push("-s", config.sessionId);
     }
 
     args.push(targetArg);
@@ -143,7 +140,7 @@ export const backends = {
   codex: new CodexBackend(),
   claude: new ClaudeBackend(),
   gemini: new GeminiBackend(),
-  opencode: new OpencodeBackend()
+  opencode: new OpencodeBackend(),
 };
 
 /**
@@ -155,8 +152,10 @@ export const backends = {
 export function selectBackend(name) {
   const backend = backends[name?.toLowerCase()];
   if (!backend) {
-    const available = Object.keys(backends).join(', ');
-    const error = new Error(`Unknown backend: ${name}. Available: ${available}`);
+    const available = Object.keys(backends).join(", ");
+    const error = new Error(
+      `Unknown backend: ${name}. Available: ${available}`,
+    );
     error.exitCode = 2;
     throw error;
   }
