@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-06-09
+
+### Fixed
+
+- Codex backend now maps `--skip-permissions` / `--yolo` to `--dangerously-bypass-approvals-and-sandbox` instead of deprecated `--full-auto`
+
+### Changed
+
+- SKILL.md documentation updated to match the current Codex permission flag
+
 ## [1.0.10] - 2026-02-27
 
 ### Fixed

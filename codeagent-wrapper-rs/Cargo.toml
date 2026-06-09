@@ -1,11 +1,11 @@
 [package]
 name = "codeagent-wrapper"
-version = "1.0.10"
+version = "1.0.11"
 edition = "2024"
 authors = ["codeagent-wrapper contributors"]
 description = "A high-performance wrapper for AI CLI backends (Claude, Codex, Gemini, Opencode)"
 license = "MIT"
-repository = "https://github.com/user/codeagent-wrapper-rs"
+repository = "https://github.com/localSummer/codeagent-wrapper-node"
 keywords = ["cli", "ai", "wrapper", "claude", "codex"]
 categories = ["command-line-utilities", "development-tools"]
 
