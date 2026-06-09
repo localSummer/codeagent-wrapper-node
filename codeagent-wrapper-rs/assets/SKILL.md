@@ -125,7 +125,7 @@ You can use `codeagent-wrapper - /path/to/dir` with stdin; `-` is task placehold
 
 | Backend  | Command              | Parameters                       | Description             | Best For                             |
 | -------- | -------------------- | -------------------------------- | ----------------------- | ------------------------------------ |
-| codex    | `--backend codex`    | `--full-auto`                    | OpenAI Codex            | Code analysis, complex development   |
+| codex    | `--backend codex`    | `--dangerously-bypass-approvals-and-sandbox` | OpenAI Codex            | Code analysis, complex development   |
 | claude   | `--backend claude`   | `--dangerously-skip-permissions` | Anthropic Claude        | Simple tasks, documentation, prompts |
 | gemini   | `--backend gemini`   | `--yolo`                         | Google Gemini           | UI/UX prototyping                    |
 | opencode | `--backend opencode` | -                                | Opencode (MiniMax-M2.1) | Code exploration                     |
@@ -173,7 +173,7 @@ You can use `codeagent-wrapper - /path/to/dir` with stdin; `-` is task placehold
 - `--model` (optional): Model override
 - `--prompt-file` (optional): Read task content from file
 - `--reasoning-effort` (optional): Reasoning effort level (backend/model dependent)
-- `--skip-permissions` / `--yolo` (optional): Skip permission checks for Claude (`--dangerously-skip-permissions`) and Codex (`--full-auto`)
+- `--skip-permissions` / `--yolo` (optional): Skip permission checks for Claude (`--dangerously-skip-permissions`) and Codex (`--dangerously-bypass-approvals-and-sandbox`)
 - `--timeout` (optional): Timeout in seconds (default: 7200)
 
 ## Return Format
@@ -226,7 +226,7 @@ Set `CODEAGENT_MAX_PARALLEL_WORKERS` to limit concurrent tasks (default: `min(10
 - `CODEX_TIMEOUT`: Override timeout in seconds (default: 7200 = 2 hours)
 - `CODEAGENT_SKIP_PERMISSIONS`: Control permission checks
   - For **Claude** backend: Adds `--dangerously-skip-permissions` (default: disabled)
-  - For **Codex** backend: Adds `--full-auto` (default: disabled)
+  - For **Codex** backend: Adds `--dangerously-bypass-approvals-and-sandbox` (default: disabled)
   - For **Gemini/Opencode** backends: No effect
 - `CODEAGENT_MAX_PARALLEL_WORKERS`: Limit concurrent tasks in parallel mode (default: min(100, cpuCount\*4), recommended: 8)
 
@@ -302,7 +302,7 @@ Note: Per-task backend is optional; if omitted, CLI `--backend` is used, then ag
 - **Claude Backend**: Permission checks enabled by default
   - To skip checks: set `CODEAGENT_SKIP_PERMISSIONS=true` or pass `--skip-permissions` / `--yolo`
   - Both enable `--dangerously-skip-permissions` flag for Claude CLI
-- **Codex Backend**: Use `--skip-permissions` / `CODEAGENT_SKIP_PERMISSIONS=true` to enable `--full-auto`
+- **Codex Backend**: Use `--skip-permissions` / `CODEAGENT_SKIP_PERMISSIONS=true` to enable `--dangerously-bypass-approvals-and-sandbox`
 - **Concurrency Limits**: Set `CODEAGENT_MAX_PARALLEL_WORKERS` in production to prevent resource exhaustion
 - **Automation Context**: This wrapper is designed for AI-driven automation where permission prompts would block execution
 

@@ -59,7 +59,7 @@ impl Backend for CodexBackend {
         }
 
         if config.skip_permissions {
-            args.push("--full-auto".to_string());
+            args.push("--dangerously-bypass-approvals-and-sandbox".to_string());
         }
 
         args.push(target.to_string());
@@ -229,9 +229,24 @@ mod tests {
 
         let args = backend.build_args(&config, "Test task");
         assert!(args.contains(&"--json".to_string()));
-        assert!(args.contains(&"--full-auto".to_string()));
+        assert!(args.contains(&"--dangerously-bypass-approvals-and-sandbox".to_string()));
+        assert!(!args.contains(&"--full-auto".to_string()));
         assert!(args.contains(&"-m".to_string()));
         assert!(args.contains(&"gpt-4".to_string()));
+    }
+
+    #[test]
+    fn test_codex_build_args_without_skip_permissions() {
+        let backend = CodexBackend;
+        let config = Config {
+            work_dir: "/tmp".into(),
+            skip_permissions: false,
+            ..Default::default()
+        };
+
+        let args = backend.build_args(&config, "Test task");
+        assert!(!args.contains(&"--dangerously-bypass-approvals-and-sandbox".to_string()));
+        assert!(!args.contains(&"--full-auto".to_string()));
     }
 
     #[test]
